@@ -991,6 +991,35 @@ html[data-theme="dark"] .q-actions button.on { color:#1C1C1E; }
 .err-list li { margin:0 0 2px; }
 .sub-block { border:1px solid var(--line-light); border-radius:var(--radius-sm); padding:10px; margin-bottom:10px; background:var(--bg-elev); }
 .sub-block textarea { width:100%; margin-bottom:6px; }
+/* ===== course layer / batch tools / import planning (added) ===== */
+.pol-note { background:var(--bg-elev); border:1px solid var(--line); border-radius:var(--radius); padding:10px 12px; font-size:12px; color:var(--ink-secondary); line-height:1.7; overflow-wrap:anywhere; word-break:break-word; }
+.pol-note.warn { border-color:var(--ink); color:var(--ink); }
+.pol-note code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; background:var(--bg-card); padding:1px 4px; border-radius:4px; }
+.pol-plan-list { display:flex; flex-direction:column; gap:8px; max-height:46vh; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-right:2px; }
+.pol-plan-row { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; background:var(--bg-card); border:1px solid var(--line-light); border-radius:var(--radius-sm); }
+.pol-plan-main { flex:1 1 auto; min-width:0; }
+.pol-plan-name { font-size:13px; font-weight:700; line-height:1.5; overflow-wrap:anywhere; word-break:break-word; }
+.pol-plan-sub { font-size:11px; color:var(--ink-secondary); line-height:1.6; margin-top:2px; overflow-wrap:anywhere; }
+.pol-badge { flex:0 0 auto; font-size:10px; font-weight:700; padding:3px 8px; border-radius:var(--radius-pill); border:1px solid var(--line); color:var(--ink-secondary); white-space:nowrap; }
+.pol-badge.new { border-color:var(--ink); color:var(--ink); }
+.pol-badge.ok { background:var(--bg-elev); }
+.pol-badge.warn { border-color:var(--ink-secondary); color:var(--ink); }
+.pol-badge.err { border-style:dashed; border-color:var(--ink-secondary); color:var(--ink); }
+.pol-badge.skip { opacity:.55; }
+.pol-check { display:flex; align-items:flex-start; gap:8px; font-size:12px; line-height:1.6; color:var(--ink); cursor:pointer; }
+.pol-check input { margin-top:2px; flex:0 0 auto; }
+@media (max-width: 768px) {
+  /* the course action pills wrap instead of hiding behind a horizontal scroll */
+  .section-pills.pol-pills { flex-wrap: wrap; overflow-x: visible; }
+  .section-pills.pol-pills .pill { max-width: 100%; flex: 0 1 auto !important; }
+}
+.pol-mini-grid { display:flex; gap:6px; flex-wrap:wrap; }
+@media (max-width: 768px) {
+  .pol-plan-row { padding:9px 10px; }
+  .pol-plan-list { max-height:42vh; }
+  .pol-select { font-size:12px; padding:7px 10px; }
+}
+
 </style>
 </head>
 <body>
@@ -1325,10 +1354,10 @@ document.addEventListener('DOMContentLoaded', () => {
    wrongBook[]  {id,qId,bookId,chapterId, yourAnswer, completed, reviewStage,nextReviewDate,lastReviewDate,reviewCount,mastered,consecutiveCorrect, ts}
    ================================================================ */
 function freshState() {
-  return { schemaVersion: SCHEMA, books: [], chapters: [], questions: [], answerLog: {}, wrongBook: [], createdAt: Date.now(), updatedAt: Date.now() };
+  return { schemaVersion: SCHEMA, books: [], courses: [], chapters: [], questions: [], answerLog: {}, wrongBook: [], createdAt: Date.now(), updatedAt: Date.now() };
 }
 let S = freshState();
-let UI = { view: 'home', bookId: null, chapterId: null, reviewBookId: 'all' };
+let UI = { view: 'home', bookId: null, courseId: null, chapterId: null, reviewBookId: 'all' };
 let cardState = {};   // transient per-card UI state (selection, typed text, retry...)
 let rv = null;        // current review session
 
@@ -1336,6 +1365,15 @@ function migrateState(d) {
   const s = freshState();
   if (!d || typeof d !== 'object') return s;
   s.books = Array.isArray(d.books) ? d.books : [];
+  /* courses: optional. Old states simply have none — their chapters keep working
+     and show up as 「未分类章节」 (nothing is re-assigned automatically). */
+  s.courses = Array.isArray(d.courses) ? d.courses.filter(c => c && typeof c === 'object').map(c => ({
+    id: String(c.id == null ? uid('course') : c.id),
+    bookId: String(c.bookId == null ? '' : c.bookId),
+    name: String(c.name == null ? '' : c.name),
+    short: String(c.short == null ? '' : c.short),
+    createdAt: c.createdAt || null
+  })) : [];
   s.chapters = Array.isArray(d.chapters) ? d.chapters : [];
   s.questions = Array.isArray(d.questions) ? d.questions : [];
   s.answerLog = (d.answerLog && typeof d.answerLog === 'object') ? d.answerLog : {};
@@ -1346,7 +1384,12 @@ function migrateState(d) {
 }
 function cleanOrphans() {
   const bookIds = new Set(S.books.map(b => b.id));
+  const courseIds = new Set(S.courses.map(c => c.id));
   S.chapters = S.chapters.filter(c => bookIds.has(c.bookId));
+  /* a chapter whose course vanished (or moved to another book) becomes 「未分类」 —
+     the chapter itself, its questions and all learning records are kept. */
+  S.chapters.forEach(c => { if (c.courseId && !courseIds.has(c.courseId)) delete c.courseId; });
+  S.courses = S.courses.filter(co => bookIds.has(co.bookId));
   const chIds = new Set(S.chapters.map(c => c.id));
   S.questions = S.questions.filter(q => chIds.has(q.chapterId));
   const qIds = new Set(S.questions.map(q => q.id));
@@ -1381,9 +1424,11 @@ function sanitizeUI() {
   const book = S.books.find(b => b.id === UI.bookId);
   const ch = S.chapters.find(c => c.id === UI.chapterId);
   if (UI.view === 'chapter') {
-    if (!ch) UI.view = book ? 'book' : 'home';
-    else UI.bookId = ch.bookId;
+    if (!ch) UI.view = book ? (UI.courseId ? 'course' : 'book') : 'home';
+    else { UI.bookId = ch.bookId; UI.courseId = ch.courseId || UNCAT; }
   }
+  if ((UI.view === 'course' || UI.view === 'multiimport') && !book) UI.view = 'home';
+  if ((UI.view === 'course' || UI.view === 'multiimport') && UI.courseId !== UNCAT && !getCourse(UI.courseId)) UI.view = 'book';
   if (UI.view === 'book' && !book) UI.view = 'home';
   if (UI.reviewBookId !== 'all' && !S.books.find(b => b.id === UI.reviewBookId)) UI.reviewBookId = 'all';
   if (UI.view === 'review' && !rv) { /* list view, fine */ }
@@ -1405,6 +1450,10 @@ function dueItems(scope) {
     if (!getQ(w.qId) || !isDueItem(w, today)) return false;
     if (scope && scope.bookId && w.bookId !== scope.bookId) return false;
     if (scope && scope.chapterId && w.chapterId !== scope.chapterId) return false;
+    if (scope && scope.courseId) {
+      const ids = new Set(chaptersOfCourse(scope.bookId, scope.courseId).map(c => c.id));
+      if (!ids.has(w.chapterId)) return false;
+    }
     return true;
   });
 }
@@ -1641,9 +1690,12 @@ function dueBtn(scopeJS, n) {
 
 function updateChrome() {
   const book = getBook(UI.bookId), ch = getChapter(UI.chapterId);
+  const course = UI.courseId && UI.courseId !== UNCAT ? getCourse(UI.courseId) : null;
   let title = 'Politics Quiz Hub';
   if (UI.view === 'book' && book) title = book.name;
-  else if (UI.view === 'chapter' && book && ch) title = book.name + ' › ' + ch.name;
+  else if (UI.view === 'course' && book) title = book.name + ' › ' + courseTitle(course);
+  else if (UI.view === 'multiimport' && book) title = '批量导入 · ' + courseTitle(course);
+  else if (UI.view === 'chapter' && book && ch) title = book.name + ' › ' + courseTitle(course) + ' › ' + ch.name;
   else if (UI.view === 'review') title = 'Review · 错题复习';
   else title = 'Politics Quiz Hub · 书籍';
   document.getElementById('topbarTitle').textContent = title;
@@ -1664,10 +1716,13 @@ function render() {
   const c = document.getElementById('mainContent');
   let html = '';
   if (UI.view === 'book') html = renderBook();
+  else if (UI.view === 'course') html = renderCourse();
+  else if (UI.view === 'multiimport') html = renderMultiImportPage();
   else if (UI.view === 'chapter') html = renderChapter();
   else if (UI.view === 'review') html = renderReview();
   else html = renderHome();
   c.innerHTML = html;
+  if (UI.view === 'multiimport') renderMultiBody();
 }
 function go(view, ids) {
   UI.view = view;
@@ -1693,7 +1748,7 @@ function renderHome() {
       <div class="bar-head">
         <div>
           <h2 class="bar-title">${esc(b.name)}</h2>
-          <div class="bar-sub">${nCh} 个章节</div>
+          <div class="bar-sub">${coursesOf(b.id).length} 个课程 · ${nCh} 个章节</div>
         </div>
         <div class="bar-actions">
           <button class="apple-btn small primary" onclick="go('book',{bookId:'${b.id}'})">Open</button>
@@ -1709,15 +1764,16 @@ function renderHome() {
   return h;
 }
 
-/* ---------- Book: chapters ---------- */
+/* ---------- Book: courses ---------- */
 function renderBook() {
   const b = getBook(UI.bookId); if (!b) return renderHome();
-  const chs = chaptersOf(b.id);
+  const cos = coursesOf(b.id);
+  const uncat = chaptersOfCourse(b.id, UNCAT);
   const st = statsFor(questionsOfBook(b.id));
   let h = `<div class="quiz-toolbar"><button class="apple-btn small" onclick="go('home')">← Books</button></div>
   <div class="bar">
     <div class="bar-head">
-      <div><h2 class="bar-title">${esc(b.name)}</h2><div class="bar-sub">${chs.length} 个章节 · 先创建章节，再为章节导入题目</div></div>
+      <div><h2 class="bar-title">${esc(b.name)}</h2><div class="bar-sub">${cos.length} 个课程 · ${chaptersOf(b.id).length} 个章节 · 先选课程，再选章节</div></div>
       <div class="bar-actions">
         ${dueBtn(`{bookId:'${b.id}'}`, st.due)}
         <button class="apple-btn small" onclick="exportBookJSON('${b.id}')" title="把这本书导出为 JSON 文件">Export</button>
@@ -1728,47 +1784,144 @@ function renderBook() {
     </div>
     ${statChips(st)}
   </div>
-  <div class="quiz-toolbar"><div class="section-pills"><div class="pill add" onclick="addChapter('${b.id}')">+ New Chapter</div></div></div>`;
-  if (!chs.length) return h + `<div class="empty-state">这本书还没有章节。点击 “+ New Chapter” 创建，例如“马克思主义基本原理”。</div>`;
+  <div class="quiz-toolbar"><div class="section-pills"><div class="pill add" onclick="openCourseEditor(null,'${b.id}')">+ New Course</div></div></div>`;
+  if (!cos.length && !uncat.length) {
+    return h + `<div class="empty-state">这本书还没有课程。<br>点击 “+ New Course” 创建，例如「习概」「毛概」，再进入课程批量创建章节、导入题目。</div>`;
+  }
+  cos.forEach(co => {
+    const chs = chaptersOfCourse(b.id, co.id);
+    const cst = statsFor(questionsOfCourse(b.id, co.id));
+    h += `<div class="bar">
+      <div class="bar-head">
+        <div style="min-width:0;">
+          <h2 class="bar-title" style="font-size:17px;">${esc(courseTitle(co))}</h2>
+          <div class="bar-sub">${esc(courseFullName(co) || '')}${courseFullName(co) ? ' · ' : ''}${chs.length} 个章节 · ${cst.total} 题</div>
+        </div>
+        <div class="bar-actions">
+          <button class="apple-btn small primary" onclick="go('course',{bookId:'${b.id}',courseId:'${co.id}'})">Open</button>
+          <button class="apple-btn small" onclick="openCourseEditor('${co.id}')">Rename</button>
+          <button class="apple-btn small danger" onclick="deleteCourse('${co.id}')">Delete</button>
+        </div>
+      </div>
+      ${cst.total ? statChips(cst) : `<div class="bar-sub" style="margin-top:10px;">还没有题目，进入课程后可以批量创建章节并导入题目。</div>`}
+    </div>`;
+  });
+  if (uncat.length) {
+    const ust = statsFor(questionsOfCourse(b.id, UNCAT));
+    h += `<div class="bar">
+      <div class="bar-head">
+        <div style="min-width:0;">
+          <h2 class="bar-title" style="font-size:17px;">未分类章节</h2>
+          <div class="bar-sub">升级前已有的章节（没有课程归属）· ${uncat.length} 个章节 · ${ust.total} 题</div>
+        </div>
+        <div class="bar-actions">
+          <button class="apple-btn small primary" onclick="go('course',{bookId:'${b.id}',courseId:'${UNCAT}'})">Open</button>
+        </div>
+      </div>
+      ${ust.total ? statChips(ust) : ''}
+    </div>`;
+  }
+  return h;
+}
+
+/* ---------- Course: chapters ---------- */
+function renderCourse() {
+  const b = getBook(UI.bookId); if (!b) return renderHome();
+  const isUncat = UI.courseId === UNCAT;
+  const co = isUncat ? null : getCourse(UI.courseId);
+  if (!isUncat && !co) return renderBook();
+  const chs = chaptersOfCourse(b.id, UI.courseId);
+  const st = statsFor(questionsOfCourse(b.id, UI.courseId));
+  const scopeJs = `{bookId:'${b.id}',courseId:'${UI.courseId}'}`;
+  let h = `<div class="quiz-toolbar"><button class="apple-btn small" onclick="go('book',{bookId:'${b.id}'})">← ${esc(b.name)}</button></div>
+  <div class="bar">
+    <div class="bar-head">
+      <div style="min-width:0;">
+        <h2 class="bar-title">${esc(courseTitle(co))}</h2>
+        <div class="bar-sub">${esc(courseFullName(co) || (isUncat ? '这些章节还没有课程归属，可以用「移动」放进某个课程' : ''))}${courseFullName(co) ? ' · ' : ''}${chs.length} 个章节 · ${st.total} 题</div>
+      </div>
+      <div class="bar-actions">
+        ${dueBtn(scopeJs, st.due)}
+        ${isUncat ? '' : `<button class="apple-btn small" onclick="openMultiImportSheet('${b.id}','${co.id}')" title="一次导入多个章节的题目">批量导入多章题目</button>`}
+      </div>
+    </div>
+    ${statChips(st)}
+  </div>`;
+  if (isUncat) {
+    h += `<div class="quiz-toolbar"><div class="section-pills"><div class="pill add" onclick="addChapter('${b.id}','')">+ New Chapter</div><div class="pill" onclick="go('book',{bookId:'${b.id}'})">返回课程列表</div></div></div>`;
+  } else {
+    h += `<div class="quiz-toolbar"><div class="section-pills pol-pills">
+      <div class="pill add" onclick="addChapter('${b.id}','${co.id}')">+ New Chapter</div>
+      <div class="pill" onclick="openBatchChapterSheet('${b.id}','${co.id}')" title="粘贴教材目录，一次创建多个章节">批量创建章节</div>
+      <div class="pill" onclick="openMultiImportSheet('${b.id}','${co.id}')" title="粘贴/上传多章节 JSON，一次导入整门课的题目">批量导入多章题目</div>
+      <div class="pill" onclick="openBookImportSheet('${b.id}')" title="导出/导入这本书的章节与题目">教材 Import / Export</div>
+    </div></div>`;
+  }
+  if (!chs.length) {
+    return h + `<div class="empty-state">这个课程还没有章节。<br>${isUncat ? '点击 “+ New Chapter” 新建。' : '点击 “批量创建章节” 粘贴教材目录，或 “+ New Chapter” 手动创建。'}</div>`;
+  }
   chs.forEach(c => {
     const cst = statsFor(questionsOfChapter(c.id));
     h += `<div class="bar">
       <div class="bar-head">
-        <div><h2 class="bar-title" style="font-size:17px;">${esc(c.name)}</h2></div>
+        <div style="min-width:0;"><h2 class="bar-title" style="font-size:17px;">${esc(c.name)}</h2>
+          <div class="bar-sub">${cst.total} 题${cst.total ? ' · 已做 ' + cst.answered : ''}</div></div>
         <div class="bar-actions">
-          <button class="apple-btn small primary" onclick="go('chapter',{bookId:'${b.id}',chapterId:'${c.id}'})">${cst.total ? 'Practice' : 'Open'}</button>
-          <button class="apple-btn small" onclick="openImportSheet('${c.id}')">Import</button>
+          <button class="apple-btn small primary" onclick="go('chapter',{bookId:'${b.id}',courseId:'${UI.courseId}',chapterId:'${c.id}'})">${cst.total ? 'Practice' : 'Open'}</button>
+          <button class="apple-btn small" onclick="openImportSheet('${c.id}')" title="粘贴或上传这个章节的题目 JSON">导入题目</button>
           <button class="apple-btn small" onclick="renameChapter('${c.id}')">Rename</button>
+          <button class="apple-btn small" onclick="openMoveChapterSheet('${c.id}')" title="把章节移动到其它课程">移动</button>
           <button class="apple-btn small danger" onclick="deleteChapter('${c.id}')">Delete</button>
         </div>
       </div>
-      ${cst.total ? statChips(cst) : `<div class="bar-sub" style="margin-top:10px;">还没有题目，点击 Import 导入。</div>`}
+      ${cst.total ? statChips(cst) : `<div class="bar-sub" style="margin-top:10px;">还没有题目，点击「导入题目」粘贴 JSON 或上传文件。</div>`}
     </div>`;
   });
   return h;
 }
 
+/* ---------- Multi-chapter import: dedicated page (large paste area on phones) ---------- */
+function renderMultiImportPage() {
+  const b = getBook(UI.bookId); if (!b) return renderHome();
+  const co = getCourse(UI.courseId);
+  const isUncat = UI.courseId === UNCAT;
+  let h = `<div class="quiz-toolbar"><button class="apple-btn small" onclick="go('course',{bookId:'${b.id}',courseId:'${UI.courseId}'})">← ${esc(courseTitle(co))}</button></div>
+  <div class="bar"><div class="bar-head"><div style="min-width:0;">
+    <h2 class="bar-title">批量导入多章题目</h2>
+    <div class="bar-sub">${esc(b.name)} › ${esc(courseTitle(co))} · ${chaptersOfCourse(b.id, UI.courseId).length} 个章节 · ${questionsOfCourse(b.id, UI.courseId).length} 题</div>
+  </div></div></div>`;
+  if (isUncat) return h + `<div class="empty-state">请先进入一个课程再批量导入题目。</div>`;
+  h += `<div id="polMultiPage"></div>
+  <input type="file" id="polMultiFile" accept=".json,application/json,text/plain" style="display:none;" onchange="handleMultiFile(event)">
+  <input type="file" id="polMultiFiles" accept=".json,application/json,text/plain" multiple style="display:none;" onchange="handleMultiFiles(event)">`;
+  return h;
+}
+
+
 /* ---------- Chapter: questions ---------- */
 function chapterBarHTML(c) {
   const st = statsFor(questionsOfChapter(c.id));
+  const co = validCourseOf(c);
   return `<div class="bar-head">
-      <div><h2 class="bar-title">${esc(c.name)}</h2><div class="bar-sub">${esc((getBook(c.bookId) || {}).name || '')}</div></div>
+      <div style="min-width:0;"><h2 class="bar-title">${esc(c.name)}</h2><div class="bar-sub">${esc((getBook(c.bookId) || {}).name || '')}${co ? ' › ' + esc(courseTitle(co)) : ''}</div></div>
       <div class="bar-actions">
         ${dueBtn(`{chapterId:'${c.id}'}`, st.due)}
-        <button class="apple-btn small primary" onclick="openImportSheet('${c.id}')">Import</button>
+        <button class="apple-btn small primary" onclick="openImportSheet('${c.id}')">导入题目</button>
       </div>
     </div>${statChips(st)}`;
 }
 function renderChapter() {
-  const c = getChapter(UI.chapterId); if (!c) return renderBook();
+  const c = getChapter(UI.chapterId); if (!c) return renderCourse();
   const b = getBook(c.bookId);
-  const pills = chaptersOf(b.id).map(x => `<div class="pill ${x.id === c.id ? 'active' : ''}" title="${esc(x.name)}">
-      <span onclick="go('chapter',{bookId:'${b.id}',chapterId:'${x.id}'})" style="cursor:pointer">${esc(x.name)}</span>
+  const courseId = c.courseId || UNCAT;
+  /* pills only list the chapters of THIS course — 习概 and 毛概 never mix */
+  const pills = chaptersOfCourse(b.id, courseId).map(x => `<div class="pill ${x.id === c.id ? 'active' : ''}" title="${esc(x.name)}">
+      <span onclick="go('chapter',{bookId:'${b.id}',courseId:'${courseId}',chapterId:'${x.id}'})" style="cursor:pointer">${esc(x.name)}</span>
       <span class="pill-act" onclick="event.stopPropagation();renameChapter('${x.id}')">/</span>
       <span class="pill-act" onclick="event.stopPropagation();deleteChapter('${x.id}')">×</span>
-    </div>`).join('') + `<div class="pill add" onclick="addChapter('${b.id}')">+ New Chapter</div>`;
+    </div>`).join('');
   const qs = questionsOfChapter(c.id);
-  let h = `<div class="quiz-toolbar"><button class="apple-btn small" onclick="go('book',{bookId:'${b.id}'})">← ${esc(b.name)}</button></div>
+  let h = `<div class="quiz-toolbar"><button class="apple-btn small" onclick="go('course',{bookId:'${b.id}',courseId:'${courseId}'})">← ${esc(courseTitle(validCourseOf(c)))}</button></div>
   <div class="quiz-toolbar"><div class="section-pills">${pills}</div></div>
   <div class="bar" id="chapterBar">${chapterBarHTML(c)}</div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
@@ -1778,7 +1931,7 @@ function renderChapter() {
       <button class="apple-btn small primary" style="font-weight:700;" onclick="redoCurrentChapter()">↻ Redo This Chapter</button>
     </div>
   </div>`;
-  if (!qs.length) return h + `<div class="empty-state">这个章节还没有题目。点击 “Import” 导入题目。</div>`;
+  if (!qs.length) return h + `<div class="empty-state">这个章节还没有题目。点击上方「导入题目」粘贴 JSON 或上传文件。</div>`;
   qs.forEach((q, i) => { h += renderQuestionCard(q, { mode: 'practice', num: i + 1 }); });
   h += `<div style="display:flex;justify-content:center;margin-top:24px;"><button class="apple-btn small" onclick="document.getElementById('mainContent').scrollTo({top:0,behavior:'smooth'})" style="border-radius:50%;width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;padding:0;font-weight:800;">Top</button></div>`;
   return h;
@@ -2019,18 +2172,21 @@ function deleteBook(id) {
   if (!confirm('删除书籍「' + b.name + '」？\n将同时删除其中 ' + nC + ' 个章节、' + nQ + ' 道题，以及相关的答题记录和错题。此操作不可恢复。')) return;
   removeQuestionsWhere(q => q.bookId === id);
   S.chapters = S.chapters.filter(c => c.bookId !== id);
+  S.courses = S.courses.filter(c => c.bookId !== id);
   S.books = S.books.filter(x => x.id !== id);
   if (UI.bookId === id) { UI.bookId = null; UI.chapterId = null; UI.view = 'home'; }
   save(); saveUI(); render(); toast('已删除');
 }
-function addChapter(bookId) {
+function addChapter(bookId, courseId) {
   const b = getBook(bookId); if (!b) return;
-  miniPrompt('Chapter name:', '', name => {
+  const co = courseId ? getCourse(courseId) : null;
+  miniPrompt('Chapter name:' + (co ? '（' + courseTitle(co) + '）' : ''), '', name => {
     if (name === null) return;
     if (!name.trim()) { toast('章节名不能为空'); return; }
     const c = { id: uid('ch'), bookId, name: name.trim(), createdAt: Date.now() };
+    if (co) c.courseId = co.id;                       // no course → legacy 「未分类」
     S.chapters.push(c); save();
-    if (UI.view === 'chapter') { go('chapter', { bookId, chapterId: c.id }); } else render();
+    if (UI.view === 'chapter') { go('chapter', { bookId, courseId: c.courseId || UNCAT, chapterId: c.id }); } else render();
     toast('已创建章节：' + c.name);
   });
 }
@@ -2048,7 +2204,7 @@ function deleteChapter(id) {
   if (!confirm('删除章节「' + c.name + '」？\n将同时删除其中 ' + n + ' 道题，以及相关的答题记录和错题。此操作不可恢复。')) return;
   removeQuestionsWhere(q => q.chapterId === id);
   S.chapters = S.chapters.filter(x => x.id !== id);
-  if (UI.chapterId === id) { UI.chapterId = null; UI.view = 'book'; }
+  if (UI.chapterId === id) { UI.chapterId = null; UI.view = UI.courseId ? 'course' : 'book'; }
   save(); saveUI(); render(); toast('已删除');
 }
 
@@ -2453,7 +2609,8 @@ function buildBookPayload(bookId) {
     schemaVersion: SCHEMA,
     exportedAt: new Date().toISOString(),
     book: { id: b.id, name: b.name, createdAt: b.createdAt || null },
-    chapters: chs.map((c, i) => ({ id: c.id, name: c.name, order: i, createdAt: c.createdAt || null })),
+    courses: coursesOf(b.id).map(co => ({ id: co.id, name: co.name, short: co.short || '', createdAt: co.createdAt || null })),
+    chapters: chs.map((c, i) => ({ id: c.id, name: c.name, courseId: c.courseId || null, order: i, createdAt: c.createdAt || null })),
     questions: qs.map(q => ({
       id: q.id, chapterId: q.chapterId, bookId: q.bookId, type: q.type,
       question: q.question || '',
@@ -2476,7 +2633,7 @@ function exportBookJSON(bookId) {
 }
 /* ---------- validation of a book file (returns a temp, validated payload) ---------- */
 function normalizeBookPayload(data) {
-  const out = { ok: false, error: null, warnings: [], bookName: '', chapters: [], questions: [], answerLog: {}, wrongBook: {} };
+  const out = { ok: false, error: null, warnings: [], bookName: '', courses: [], chapters: [], questions: [], answerLog: {}, wrongBook: {} };
   if (!data || typeof data !== 'object' || Array.isArray(data)) { out.error = '文件顶层不是对象（应为本功能导出的书籍 JSON）'; return out; }
   if (data.passages || data.grammarQuestions || data.quizSets || data.roadmap) { out.error = '这是英语 Quiz Hub 的数据，不能导入到政治版'; return out; }
   if (data.kind === 'politics-backup' || (Array.isArray(data.books) && Array.isArray(data.chapters))) {
@@ -2514,13 +2671,28 @@ function normalizeBookPayload(data) {
     let sid = c.id == null ? '' : String(c.id);
     if (!sid || usedIds.has(sid)) sid = '__ch_' + i + '_' + Math.random().toString(36).slice(2, 6);
     usedIds.add(sid);
-    const rec = { srcId: sid, name: name, createdAt: c.createdAt || null };
+    const rec = { srcId: sid, name: name, createdAt: c.createdAt || null,
+                  courseSrcId: c.courseId == null ? '' : String(c.courseId) };
     out.chapters.push(rec);
     idMap.set(sid, rec);
     if (c.id != null) idMap.set(String(c.id), rec);
   }
   if (!out.chapters.length) { out.error = '文件里没有可用的章节'; return out; }
 
+  /* optional course layer in the file (absent in older exports → all chapters 未分类) */
+  if (Array.isArray(data.courses)) {
+    data.courses.forEach((co, i) => {
+      if (!co || typeof co !== 'object') return;
+      const nm = String(co.name == null ? '' : co.name).trim();
+      if (!nm) return;
+      const sid = String(co.id == null ? ('__course_' + i) : co.id);
+      out.courses.push({ srcId: sid, name: nm, short: String(co.short == null ? '' : co.short).trim(), createdAt: co.createdAt || null });
+    });
+  }
+  out.chapters.forEach(ch => {
+    if (!ch.courseSrcId) return;
+    if (!out.courses.some(c => c.srcId === ch.courseSrcId)) { ch.courseSrcId = ''; out.warnings.push('章节「' + ch.name + '」的课程在文件里不存在，导入后为「未分类」'); }
+  });
   const qIdMap = new Map();
   for (let i = 0; i < qSrc.length; i++) {
     const raw = qSrc[i];
@@ -2572,23 +2744,43 @@ function applyBookImport(target, p, mode, newName) {
   const qIdMap = new Map();             // source question id -> question id on this device
   const newChapters = [], newQuestions = [], newLogs = {}, newWrongs = [];
   let book = null;
+  const newCourses = [], courseIdMap = new Map();   // source course id -> course id on this device
   if (mode === 'new') {
     book = { id: uid('book'), name: newName, createdAt: now };
+    (p.courses || []).forEach((co, i) => {
+      const id = uid('course');
+      courseIdMap.set(co.srcId, id);
+      newCourses.push({ id: id, bookId: book.id, name: co.name, short: co.short || '', createdAt: co.createdAt || now + i });
+    });
     p.chapters.forEach((ch, i) => {
       const id = uid('ch');
       chIdMap.set(ch.srcId, id);
-      newChapters.push({ id: id, bookId: book.id, name: ch.name, createdAt: ch.createdAt || now + i });
+      const rec = { id: id, bookId: book.id, name: ch.name, createdAt: ch.createdAt || now + i };
+      const cid = ch.courseSrcId ? courseIdMap.get(ch.courseSrcId) : null;
+      if (cid) rec.courseId = cid;
+      newChapters.push(rec);
     });
   } else {
     book = target;
     if (!book) throw new Error('目标书籍不存在');
+    const existingCourses = coursesOf(book.id).slice();
+    (p.courses || []).forEach((co, i) => {
+      const found = existingCourses.find(x => normChapterName(x.name) === normChapterName(co.name) || (co.short && normChapterName(x.short) === normChapterName(co.short)));
+      if (found) { courseIdMap.set(co.srcId, found.id); return; }
+      const rec = { id: uid('course'), bookId: book.id, name: co.name, short: co.short || '', createdAt: co.createdAt || now + i };
+      newCourses.push(rec); existingCourses.push(rec);
+      courseIdMap.set(co.srcId, rec.id);
+    });
     const existing = chaptersOf(book.id).slice();
     p.chapters.forEach((ch, i) => {
-      const found = existing.find(c => c.name.trim().toLowerCase() === ch.name.trim().toLowerCase());
+      const srcCourseId = ch.courseSrcId ? courseIdMap.get(ch.courseSrcId) : null;
+      const sameName = existing.filter(c => normChapterName(c.name) === normChapterName(ch.name));
+      const found = (srcCourseId ? sameName.find(c => c.courseId === srcCourseId) : null) || sameName[0] || null;
       if (found) { chIdMap.set(ch.srcId, found.id); return; }
       const id = uid('ch');
       chIdMap.set(ch.srcId, id);
       const rec = { id: id, bookId: book.id, name: ch.name, createdAt: ch.createdAt || now + i };
+      if (srcCourseId) rec.courseId = srcCourseId;
       newChapters.push(rec);
       existing.push(rec);
     });
@@ -2639,6 +2831,7 @@ function applyBookImport(target, p, mode, newName) {
   Object.keys(newLogs).forEach(k => { nextAnswerLog[k] = newLogs[k]; });
   S = Object.assign({}, S, {
     books: mode === 'new' ? S.books.concat([book]) : S.books.slice(),
+    courses: S.courses.concat(newCourses),
     chapters: S.chapters.concat(newChapters),
     questions: S.questions.concat(newQuestions),
     answerLog: nextAnswerLog,
@@ -2647,7 +2840,7 @@ function applyBookImport(target, p, mode, newName) {
   save();
   render();
   return {
-    book: book, isNew: mode === 'new', name: book.name,
+    book: book, isNew: mode === 'new', name: book.name, courses: newCourses.length,
     chapters: newChapters.length, reusedChapters: mode === 'merge' ? (p.chapters.length - newChapters.length) : 0,
     questions: newQuestions.length, skipped: skipped,
     logs: Object.keys(newLogs).length, wrongs: newWrongs.length
@@ -2809,6 +3002,836 @@ function confirmBookImport() {
 }
 
 /* ================================================================
+   COURSES — book → course → chapter → practice
+   courses[]   {id, bookId, name, short, createdAt}
+   chapter.courseId → courses[].id
+   Legacy chapters have no courseId (or a dangling one); they are NEVER
+   re-assigned automatically — they show up under 「未分类章节」 and can be
+   moved into a course from the UI. Nothing is deleted, no id is rebuilt.
+   ================================================================ */
+const UNCAT = '__uncategorized__';
+const getCourse = id => S.courses.find(c => c.id === id) || null;
+const coursesOf = bid => S.courses.filter(c => c.bookId === bid);
+function validCourseOf(ch) {
+  if (!ch || !ch.courseId) return null;
+  const co = getCourse(ch.courseId);
+  return (co && co.bookId === ch.bookId) ? co : null;
+}
+function chaptersOfCourse(bookId, courseId) {
+  if (courseId === UNCAT) return S.chapters.filter(c => c.bookId === bookId && !validCourseOf(c));
+  return S.chapters.filter(c => c.bookId === bookId && c.courseId === courseId);
+}
+function questionsOfCourse(bookId, courseId) {
+  const ids = new Set(chaptersOfCourse(bookId, courseId).map(c => c.id));
+  return S.questions.filter(q => ids.has(q.chapterId));
+}
+function courseTitle(course) { return course ? (course.short || course.name) : '未分类章节'; }
+function courseFullName(course) {
+  if (!course) return '没有课程归属的旧章节';
+  return course.short && course.name && course.short !== course.name ? course.name : '';
+}
+/* normalised chapter name, used ONLY for matching — never written back */
+function normChapterName(s) {
+  return String(s == null ? '' : s)
+    .replace(/[\s\u3000]+/g, '')
+    .replace(/^第\s*[0-9一二三四五六七八九十百零〇两]+\s*[章节篇讲单元部分专题]/,'')
+    .replace(/^[（(]?\s*[0-9]{1,3}\s*[）)]?\s*(?:[\.、,，:：]\s*|\s+)/,'')
+    .replace(/[（(]\s*[)）]/g, '')
+    .replace(/[\-—_·•・.。]+/g, '')
+    .toLowerCase();
+}
+function chapterNoOf(s) {
+  const m = String(s == null ? '' : s).match(/第\s*([0-9]+|[一二三四五六七八九十百零〇两]+)\s*[章节篇讲单元部分专题]/);
+  if (m) {
+    const t = m[1];
+    if (/^[0-9]+$/.test(t)) return parseInt(t, 10);
+    const CN = { '零': 0, '〇': 0, '一': 1, '二': 2, '两': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
+    if (/^[零〇一二三四五六七八九]$/.test(t)) return CN[t];
+    if (/^十$/.test(t)) return 10;
+    const m2 = t.match(/^([一二三四五六七八九])?十([一二三四五六七八九])?$/);
+    if (m2) return (m2[1] ? CN[m2[1]] : 1) * 10 + (m2[2] ? CN[m2[2]] : 0);
+    return null;
+  }
+  const m3 = String(s == null ? '' : s).trim().match(/^[（(]?\s*([0-9]{1,3})\s*[）)]?\s*[\.、,，:：]?\s+/);
+  return m3 ? parseInt(m3[1], 10) : null;
+}
+
+/* ---------- course editor (name + optional short name) ---------- */
+function openCourseEditor(courseId, bookId) {
+  const co = courseId ? getCourse(courseId) : null;
+  const b = co ? getBook(co.bookId) : getBook(bookId);
+  if (!b) { toast('书籍不存在'); return; }
+  openGenericSheet(co ? ('编辑课程 — ' + courseTitle(co)) : ('新建课程 — ' + b.name), `
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div style="padding:12px 14px;background:var(--bg-elev);border:1px solid var(--line);border-radius:var(--radius);font-size:12px;color:var(--ink-secondary);line-height:1.7;">
+        课程属于《${esc(b.name)}》。每个课程独立拥有自己的章节，例如「习概」和「毛概」。
+      </div>
+      <div class="field"><label>课程名称（必填）</label>
+        <input type="text" id="polCourseName" value="${esc(co ? co.name : '')}" placeholder="例如：习近平新时代中国特色社会主义思想概论"></div>
+      <div class="field"><label>简称（可选，用于卡片标题）</label>
+        <input type="text" id="polCourseShort" value="${esc(co ? (co.short || '') : '')}" placeholder="例如：习概"></div>
+      <div id="polCourseErr" class="bar-sub" style="color:var(--ink);"></div>
+    </div>`, [
+    { text: 'Cancel', onclick: () => closeSheet('genericSheet') },
+    { text: co ? 'Save' : 'Create', cls: 'primary', onclick: () => saveCourseEditor(courseId, b.id) }
+  ]);
+}
+function saveCourseEditor(courseId, bookId) {
+  const nameEl = document.getElementById('polCourseName'), shortEl = document.getElementById('polCourseShort');
+  const name = (nameEl ? nameEl.value : '').trim();
+  const short = (shortEl ? shortEl.value : '').trim();
+  const errEl = document.getElementById('polCourseErr');
+  if (!name) { if (errEl) errEl.textContent = '课程名称不能为空'; return; }
+  const clash = coursesOf(bookId).find(c => c.id !== courseId && c.name.trim() === name);
+  if (clash) { if (errEl) errEl.textContent = '这本书里已经有同名课程了'; return; }
+  if (courseId) {
+    const co = getCourse(courseId); if (!co) { toast('课程不存在'); return; }
+    co.name = name; co.short = short;
+    save(); closeSheet('genericSheet'); render(); toast('已保存课程');
+  } else {
+    const co = { id: uid('course'), bookId: bookId, name: name, short: short, createdAt: Date.now() };
+    S.courses.push(co);
+    save(); closeSheet('genericSheet');
+    go('course', { bookId: bookId, courseId: co.id });
+    toast('已创建课程：' + (short || name));
+  }
+}
+function deleteCourse(id) {
+  const co = getCourse(id); if (!co) return;
+  const chs = chaptersOfCourse(co.bookId, co.id);
+  if (!confirm('删除课程「' + courseTitle(co) + '」？\n\n它下面的 ' + chs.length + ' 个章节、以及题目、答题记录和错题都会被保留，但会变成「未分类章节」，之后可以再移回其它课程。\n\n（不会删除任何题目和学习记录）')) return;
+  S.courses = S.courses.filter(c => c.id !== id);
+  S.chapters.forEach(ch => { if (ch.courseId === id) delete ch.courseId; });
+  if (UI.courseId === id) { UI.courseId = UNCAT; if (UI.view === 'course' || UI.view === 'chapter') UI.view = 'book'; UI.chapterId = null; }
+  save(); saveUI(); closeSheet('genericSheet'); render();
+  toast('已删除课程，原章节保留为「未分类」');
+}
+/* ---------- move a legacy chapter into a course ---------- */
+function openMoveChapterSheet(chapterId) {
+  const ch = getChapter(chapterId); if (!ch) { toast('章节不存在'); return; }
+  const b = getBook(ch.bookId); if (!b) return;
+  const list = coursesOf(b.id);
+  const rows = list.map(co => `<div class="pol-plan-row">
+      <div class="pol-plan-main"><div class="pol-plan-name">${esc(courseTitle(co))}</div>
+      <div class="pol-plan-sub">${esc(courseFullName(co) || '')}${courseFullName(co) ? ' · ' : ''}${chaptersOfCourse(b.id, co.id).length} 个章节 · ${questionsOfCourse(b.id, co.id).length} 题</div></div>
+      <button class="apple-btn small ${ch.courseId === co.id ? 'primary' : ''}" onclick="moveChapterToCourse('${ch.id}','${co.id}')">${ch.courseId === co.id ? '当前' : '移到这里'}</button>
+    </div>`).join('');
+  openGenericSheet('移动章节到课程 — ' + ch.name, `
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="padding:12px 14px;background:var(--bg-elev);border:1px solid var(--line);border-radius:var(--radius);font-size:12px;color:var(--ink-secondary);line-height:1.7;">
+        章节《${esc(ch.name)}》当前归属：<b>${esc(ch.courseId && validCourseOf(ch) ? courseTitle(validCourseOf(ch)) : '未分类')}</b>。移动只改变课程归属，题目、答题记录、错题和复习进度都跟着章节走，不会丢失。
+      </div>
+      ${rows || '<div class="empty-state">这本书还没有课程，先创建一个课程。</div>'}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="apple-btn small" onclick="closeSheet('genericSheet');openCourseEditor(null,'${b.id}')">+ 新建课程</button>
+        ${ch.courseId ? `<button class="apple-btn small" onclick="moveChapterToCourse('${ch.id}','')">移出课程（变成未分类）</button>` : ''}
+      </div>
+    </div>`, [{ text: 'Close', onclick: () => closeSheet('genericSheet') }]);
+}
+function moveChapterToCourse(chapterId, courseId) {
+  const ch = getChapter(chapterId); if (!ch) { toast('章节不存在'); return; }
+  if (courseId) {
+    const co = getCourse(courseId);
+    if (!co || co.bookId !== ch.bookId) { toast('目标课程不属于这本书'); return; }
+    ch.courseId = co.id;
+  } else {
+    delete ch.courseId;
+  }
+  save(); closeSheet('genericSheet');
+  render(); toast('已移动章节');
+}
+
+/* ================================================================
+   BATCH CHAPTER CREATION (paste a textbook table of contents)
+   Parsing never writes to S — first a preview, then an explicit confirm.
+   ================================================================ */
+function cleanChapterLine(raw) {
+  let s = String(raw == null ? '' : raw).replace(/[\u00A0\u3000]/g, ' ').trim();
+  s = s.replace(/^[-–—•·●○◆▪※*]+\s*/, '');
+  s = s.replace(/[\s]*[\.．·…]{2,}\s*\d{1,4}\s*$/, '');       // …… 12 / ....12
+  s = s.replace(/\s{2,}\d{1,4}\s*$/, '');                      // tab + page number
+  s = s.replace(/[\s]+/g, ' ').trim();
+  return s;
+}
+/* "1. 第五章 …" / "01 第三章 …" / "(2) 第四章 …" → drop the redundant list number */
+function stripListNumber(s) {
+  return String(s == null ? '' : s)
+    .replace(/^[（(]?\s*[0-9]{1,3}\s*[）)]?\s*(?:[\.、,，:：]\s*|\s+)/, '')
+    .trim();
+}
+function parseSyllabus(text) {
+  const lines = String(text || '').split(/\r?\n/);
+  const CN = '一二三四五六七八九十百零〇两';
+  const reZhang = new RegExp('^第\\s*([0-9]+|[' + CN + ']+)\\s*([章节篇讲单元部分专题])\\s*[、,，\\.．:：\\-—]?\\s*(.*)$');
+  const reNum = /^[（(]?\s*([0-9]{1,3})\s*[）)]?\s*[\.、,，:：）)]?\s*(.+)$/;
+  const cleaned = [];
+  lines.forEach((ln, i) => {
+    const t = cleanChapterLine(ln);
+    if (!t) return;                                  // blank line → ignored silently
+    if (/^(目录|目\s*录|contents|contents:)$/i.test(t)) return;
+    cleaned.push({ line: i + 1, text: t, stripped: stripListNumber(t) });
+  });
+  const hasZhang = cleaned.some(x => reZhang.test(x.text) || (x.stripped && reZhang.test(x.stripped)));
+  const hasNum = cleaned.some(x => reNum.test(x.text));
+  const items = [], ignored = [];
+  cleaned.forEach(x => {
+    let ok = false, no = null, name = x.text;
+    /* 第一章 xxx  (also behind a "1." / "01 " list number) */
+    if (reZhang.test(x.stripped)) { ok = true; name = x.stripped; no = chapterNoOf(x.stripped); }
+    else if (reZhang.test(x.text)) { ok = true; name = x.text; no = chapterNoOf(x.text); }
+    /* 1. xxx / 1、xxx / 01 xxx  (only when the text has no 第X章 style at all) */
+    if (!ok && !hasZhang && hasNum) {
+      const m2 = x.text.match(reNum);
+      if (m2) { ok = true; no = parseInt(m2[1], 10); name = (x.stripped || x.text).trim() || x.text; }
+    }
+    if (!ok && !hasZhang && !hasNum) ok = true;        // plain list of names
+    if (!ok) { ignored.push(x); return; }
+    items.push({ raw: x.text, name: name, no: no, line: x.line });
+  });
+  /* duplicates inside the pasted text (by normalised name) */
+  const seen = {}, dupes = [];
+  const unique = [];
+  items.forEach(it => {
+    const key = normChapterName(it.name);
+    if (!key) { ignored.push({ line: it.line, text: it.raw }); return; }
+    if (seen[key]) { dupes.push(it); seen[key].dupCount = (seen[key].dupCount || 0) + 1; return; }
+    seen[key] = it; it.key = key; unique.push(it);
+  });
+  return { items: unique, ignored: ignored, dupes: dupes, mode: hasZhang ? '章' : (hasNum ? '序号' : '纯文本') };
+}
+let batchChapterCtx = null;    // { bookId, courseId, parsed, moveSame }
+function openBatchChapterSheet(bookId, courseId) {
+  const b = getBook(bookId); if (!b) { toast('书籍不存在'); return; }
+  const co = courseId && courseId !== UNCAT ? getCourse(courseId) : null;
+  if (!co) { toast('请先进入一个课程，再批量创建章节'); return; }
+  batchChapterCtx = { bookId: b.id, courseId: co.id, parsed: null, moveSame: false };
+  openGenericSheet('批量创建章节 — ' + courseTitle(co), `
+    <div id="polBatchChapterBody"></div>
+  `, [
+    { text: 'Close', onclick: () => { batchChapterCtx = null; closeSheet('genericSheet'); } },
+    { text: '解析预览', onclick: parseBatchChapters },
+    { text: '创建章节', cls: 'primary', onclick: confirmBatchChapters }
+  ]);
+  renderBatchChapterBody();
+}
+function renderBatchChapterBody() {
+  const wrap = document.getElementById('polBatchChapterBody');
+  if (!wrap || !batchChapterCtx) return;
+  const ctx = batchChapterCtx, b = getBook(ctx.bookId), co = getCourse(ctx.courseId);
+  let h = `<div style="display:flex;flex-direction:column;gap:14px;">
+    <div style="padding:12px 14px;background:var(--bg-elev);border:1px solid var(--line);border-radius:var(--radius);font-size:12px;color:var(--ink-secondary);line-height:1.7;">
+      目标：<b>《${esc(b.name)}》 › ${esc(courseTitle(co))}</b>（现有 ${chaptersOfCourse(b.id, co.id).length} 个章节）。<br>
+      直接粘贴教材目录，每行一个章节。支持 <b>第一章 xxx</b> / <b>第1章 xxx</b> / <b>1. xxx</b> / <b>1、xxx</b> / <b>01 xxx</b>；空行和页码会被忽略。此操作只创建章节，不会生成题目，也不会删除现有章节。
+    </div>
+    <textarea id="polSyllabusArea" class="ai-studio-import-textarea" style="min-height:200px;max-height:44vh;overflow:auto;" placeholder="第一章 毛泽东思想及其历史地位
+第二章 新民主主义革命理论
+第三章 社会主义改造理论
+第四章 社会主义建设道路初步探索的理论成果"></textarea>`;
+  const p = ctx.parsed;
+  if (p) {
+    const existing = chaptersOfCourse(b.id, co.id);
+    const plan = p.items.map(it => {
+      const same = existing.find(c => normChapterName(c.name) === it.key);
+      const other = same ? null : S.chapters.find(c => c.bookId === b.id && c.courseId !== co.id && normChapterName(c.name) === it.key);
+      return { it: it, same: same || null, other: other || null };
+    });
+    const nNew = plan.filter(x => !x.same).length;
+    const nSkip = plan.filter(x => x.same).length;
+    ctx.plan = plan;
+    h += `<div id="polBatchChapterStatus" class="ai-studio-status" style="line-height:1.8;">解析完成（按「${p.mode}」格式识别）：<b>${p.items.length}</b> 个章节 · 预计新增 <b>${nNew}</b> 个 · 已存在跳过 <b>${nSkip}</b> 个${p.ignored.length ? ' · 忽略 ' + p.ignored.length + ' 行' : ''}${p.dupes.length ? ' · 文内重复 ' + p.dupes.length + ' 行' : ''}</div>`;
+    h += `<div class="pol-plan-list">${plan.map((x, i) => `
+      <div class="pol-plan-row">
+        <div class="pol-plan-main">
+          <div class="pol-plan-name">${i + 1}. ${esc(x.it.name)}</div>
+          <div class="pol-plan-sub">${x.it.no ? '识别序号 ' + x.it.no + ' · ' : ''}${x.same ? '已存在，将跳过（不覆盖）' : (x.other ? '同名章节在另一个课程里，本课程中会新建' : '将新建')}</div>
+        </div>
+        <span class="pol-badge ${x.same ? 'skip' : 'new'}">${x.same ? '已存在' : '新建'}</span>
+      </div>`).join('')}</div>`;
+    if (p.dupes.length) h += `<div class="pol-note warn">⚠️ 粘贴内容里有 ${p.dupes.length} 行重复章节，已自动去重：${esc(p.dupes.slice(0, 6).map(x => x.raw).join(' / '))}${p.dupes.length > 6 ? ' …' : ''}</div>`;
+    if (p.ignored.length) h += `<div class="pol-note">已忽略 ${p.ignored.length} 行无法识别的内容（例如小节标题、页码）：${esc(p.ignored.slice(0, 6).map(x => x.text).join(' / '))}${p.ignored.length > 6 ? ' …' : ''}</div>`;
+    const otherCount = plan.filter(x => x.other).length;
+    if (otherCount) h += `<label class="pol-check"><input type="checkbox" id="polMoveSame" ${ctx.moveSame ? 'checked' : ''} onchange="batchChapterCtx.moveSame=this.checked">
+      <span>把其它课程中同名的 ${otherCount} 个章节移动到本课程（默认关闭；开启后那些章节会离开原课程）</span></label>`;
+    h += `<div class="pol-note">确认后会新增 <b>${nNew}</b> 个章节到「${esc(courseTitle(co))}」，顺序与粘贴内容一致。</div>`;
+  } else {
+    h += `<div id="polBatchChapterStatus" class="ai-studio-status">粘贴目录后点「解析预览」，先预览再创建。</div>`;
+  }
+  h += `</div>`;
+  wrap.innerHTML = h;
+}
+function parseBatchChapters() {
+  if (!batchChapterCtx) return;
+  const ta = document.getElementById('polSyllabusArea');
+  const text = ta ? ta.value : '';
+  if (!String(text).trim()) { toast('请先粘贴教材目录', 2600); return; }
+  const p = parseSyllabus(text);
+  if (!p.items.length) {
+    document.getElementById('polBatchChapterStatus').innerHTML = '❌ 没有识别到任何章节行，请检查粘贴内容。';
+    toast('没有识别到章节', 2600); return;
+  }
+  batchChapterCtx.parsed = p;
+  renderBatchChapterBody();
+}
+function confirmBatchChapters() {
+  const ctx = batchChapterCtx;
+  if (!ctx) return;
+  if (!ctx.parsed || !ctx.plan) { toast('请先点「解析预览」', 2600); return; }
+  const b = getBook(ctx.bookId), co = getCourse(ctx.courseId);
+  if (!b || !co) { toast('目标课程不存在'); return; }
+  const now = Date.now();
+  const created = [], moved = [];
+  let skipped = 0;
+  ctx.plan.forEach((x, i) => {
+    if (x.same) { skipped++; return; }
+    if (x.other && ctx.moveSame) {
+      x.other.courseId = co.id;
+      x.other.bookId = co.bookId;
+      moved.push(x.other);
+      return;
+    }
+    created.push({ id: uid('ch'), bookId: b.id, courseId: co.id, name: x.it.name, createdAt: now + i });
+  });
+  if (!created.length && !moved.length) {
+    toast('没有需要新建的章节（全部已存在）', 3000);
+    document.getElementById('polBatchChapterStatus').innerHTML = `已存在 ${skipped} 个章节，本次没有新增。`;
+    return;
+  }
+  S.chapters = S.chapters.concat(created);     // single write
+  save();
+  batchChapterCtx = null;
+  closeSheet('genericSheet');
+  render();
+  toast('已新增 ' + created.length + ' 个章节' + (moved.length ? '，移动 ' + moved.length + ' 个' : '') + (skipped ? '，跳过 ' + skipped + ' 个' : ''), 3200);
+}
+
+/* ================================================================
+   MULTI-CHAPTER IMPORT (paste / upload one JSON for a whole course)
+   Format:  { format:"politics-quiz-import", version:"1.0",
+              book:"教材名", course:"课程名",
+              chapters:[ { name:"第一章 …", questions:[ <题目对象> ] } ] }
+   Re-uses normalizeQuestion() so the question fields are exactly the ones the
+   rest of the app already uses (type / question / options / answer /
+   explanation / material / subQuestions).  options may be an array or a
+   {"A":…,"B":…} map — the same mapping layer the single-chapter import had.
+   Nothing is written until the whole file validated AND the user confirmed.
+   ================================================================ */
+let multiCtx = null;   // { bookId, courseId, text, filename, plan, parsed, opts }
+
+function multiSig(q) {
+  const body = String(q.question || q.material || '').replace(/\s+/g, '').slice(0, 200);
+  const ans = Array.isArray(q.answer) ? q.answer.join('') : String(q.answer == null ? '' : q.answer);
+  return q.type + '|' + body + '|' + ans.replace(/\s+/g, '');
+}
+function optionsMapToArray(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+  const LETTERS_ = 'ABCDEFGH';
+  const keys = Object.keys(raw);
+  const onlyLetters = keys.length > 0 && keys.every(k => /^[A-Ha-h]$/.test(k));
+  if (!onlyLetters) return raw;
+  return keys.sort((a, b) => LETTERS_.indexOf(a.toUpperCase()) - LETTERS_.indexOf(b.toUpperCase()))
+    .map(k => k.toUpperCase() + '. ' + String(raw[k] == null ? '' : raw[k]).replace(/\s*\n\s*/g, ' ').trim());
+}
+function fmtCourseLabel(co) { return co ? (co.short ? co.short + '（' + co.name + '）' : co.name) : '未分类'; }
+
+/* ---------- pure validation / matching ---------- */
+function parseMultiChapterPayload(data, ctx) {
+  const out = { ok: false, fatal: null, notices: [], chapters: [], totals: { chapters: 0, questions: 0, ok: 0, dup: 0, err: 0 } };
+  const b = getBook(ctx.bookId), co = getCourse(ctx.courseId);
+  if (!b || !co) { out.fatal = '目标教材或课程不存在'; return out; }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) { out.fatal = 'JSON 顶层必须是一个对象（{ "chapters": [ … ] }）'; return out; }
+  if (data.passages || data.grammarQuestions || data.quizSets || data.roadmap) { out.fatal = '这是英语 Quiz Hub 的数据，不能导入到政治版'; return out; }
+  if (data.kind === 'politics-backup') { out.fatal = '这是整库备份文件，请用 Backup → Import Backup 恢复'; return out; }
+  if (data.kind === 'politics-book') { out.fatal = '这是「单本书导出」文件，请用教材卡片上的 Import 导入'; return out; }
+
+  /* textbook/course guard — a 习概 file can never land in 毛概 */
+  const bookName = data.book == null ? '' : String(data.book).trim();
+  if (bookName && normChapterName(bookName) !== normChapterName(b.name)) {
+    out.fatal = '导入文件里的教材是「' + bookName + '」，当前教材是「' + b.name + '」。为防止导错教材，已停止导入。请先打开正确的教材再试。';
+    return out;
+  }
+  const courseName = data.course == null ? '' : String(data.course).trim();
+  if (courseName) {
+    const n = normChapterName(courseName);
+    const cand = [co.name, co.short].filter(Boolean).map(normChapterName);
+    const hit = cand.some(x => x && (x === n || x.indexOf(n) >= 0 || n.indexOf(x) >= 0));
+    if (!hit) {
+      out.fatal = '导入文件里的课程是「' + courseName + '」，当前课程是「' + fmtCourseLabel(co) + '」。为防止把课程题目混在一起，已停止导入。请先进入正确的课程再试。';
+      return out;
+    }
+  }
+  let list = null;
+  if (Array.isArray(data.chapters)) list = data.chapters;
+  else if (Array.isArray(data.questions)) {
+    const nm = String(data.chapter == null ? '' : data.chapter).trim() || String(data.chapterName == null ? '' : data.chapterName).trim();
+    if (!nm) { out.fatal = '这个文件只有 questions，没有 chapters（也没有 chapter 名称）。请使用多章节格式，或到单个章节里用 Import 导入。'; return out; }
+    list = [{ name: nm, questions: data.questions }];
+    out.notices.push('文件只有一章（' + nm + '），按单章处理。');
+  }
+  if (!list || !list.length) { out.fatal = '找不到 chapters 数组（应形如 { "chapters": [ { "name": "第一章 …", "questions": [...] } ] }）'; return out; }
+
+  const existing = chaptersOfCourse(b.id, co.id);
+  const byNorm = {};
+  existing.forEach(c => { const k = normChapterName(c.name); (byNorm[k] = byNorm[k] || []).push(c); });
+  const usedTargets = new Set();
+  const seenInFile = {};   // normName -> srcName (duplicate chapter entries inside one file)
+
+  list.forEach((rawCh, ci) => {
+    const rec = { idx: ci, srcName: '', no: null, status: 'new', targetId: '', candidates: [], questions: [],
+                  chapterErrors: [], skipped: false, skipReasons: [], key: '' };
+    const name = rawCh && typeof rawCh === 'object' ? String(rawCh.name == null ? (rawCh.chapter == null ? '' : rawCh.chapter) : rawCh.name).trim() : '';
+    rec.srcName = name || ('（第 ' + (ci + 1) + ' 项没有名称）');
+    if (!name) { rec.status = 'error'; rec.chapterErrors.push('这一项没有章节名称（name）'); out.chapters.push(rec); return; }
+    rec.key = normChapterName(name);
+    rec.no = chapterNoOf(name);
+    if (seenInFile[rec.key]) out.notices.push('文件里章节「' + name + '」出现了多次，会合并到同一章节。');
+    seenInFile[rec.key] = name;
+
+    /* ---- matching: name first, then a UNIQUE chapter number inside this course ---- */
+    const sameName = (byNorm[rec.key] || []).filter(c => !usedTargets.has(c.id));
+    if (sameName.length === 1) { rec.status = 'matched'; rec.targetId = sameName[0].id; }
+    else if (sameName.length > 1) { rec.status = 'ambiguous'; rec.candidates = sameName.map(c => ({ id: c.id, name: c.name })); }
+    else if (rec.no != null) {
+      const sameNo = existing.filter(c => !usedTargets.has(c.id) && chapterNoOf(c.name) === rec.no);
+      if (sameNo.length === 1) {
+        rec.status = 'loose'; rec.targetId = sameNo[0].id;
+        rec.skipReasons.push('章节名不完全一致，按序号匹配到「' + sameNo[0].name + '」');
+      } else if (sameNo.length > 1) {
+        rec.status = 'ambiguous'; rec.candidates = sameNo.map(c => ({ id: c.id, name: c.name }));
+        rec.skipReasons.push('有多个章节可能是目标，请选择');
+      }
+    }
+    if (rec.status === 'new') {
+      const otherCourse = S.chapters.find(c => c.bookId === b.id && c.courseId !== co.id && normChapterName(c.name) === rec.key);
+      rec.skipReasons.push(otherCourse ? '同名章节在别的课程里，本课程中会新建' : '本课程中没有这个章节，会新建');
+    }
+    if (rec.targetId) usedTargets.add(rec.targetId);
+
+    /* ---- questions ---- */
+    const qs = rawCh && Array.isArray(rawCh.questions) ? rawCh.questions
+      : (rawCh && Array.isArray(rawCh.items) ? rawCh.items : null);
+    if (!qs) { rec.chapterErrors.push('缺少 questions 数组'); rec.status = 'error'; out.chapters.push(rec); return; }
+    if (!qs.length) { rec.skipReasons.push('这一章没有题目（只创建/匹配章节，不写入题目）'); }
+    const dupKeys = new Set();
+    if (rec.targetId) questionsOfChapter(rec.targetId).forEach(q => dupKeys.add(multiSig(q)));
+    qs.forEach((rawQ, qi) => {
+      const q2 = (rawQ && typeof rawQ === 'object' && !Array.isArray(rawQ)) ? Object.assign({}, rawQ) : rawQ;
+      if (q2 && typeof q2 === 'object' && q2.options) q2.options = optionsMapToArray(q2.options);
+      const r = normalizeQuestion(q2);
+      const item = { idx: qi, q: r.q, errors: r.errors, dup: false, note: '' };
+      if (r.q) {
+        const sig = multiSig(r.q);
+        if (dupKeys.has(sig)) { item.dup = true; item.note = '与已有题目或文件内前面的题目重复'; }
+        else dupKeys.add(sig);
+      }
+      rec.questions.push(item);
+    });
+    out.chapters.push(rec);
+  });
+
+  /* totals */
+  out.chapters.forEach(rec => {
+    out.totals.chapters++;
+    out.totals.questions += rec.questions.length;
+    rec.questions.forEach(it => { if (it.errors.length) out.totals.err++; else if (it.dup) out.totals.dup++; else out.totals.ok++; });
+    if (rec.chapterErrors.length) out.totals.err++;
+  });
+  out.ok = !out.fatal;
+  return out;
+}
+function multiStats(plan) {
+  const s = { newCh: 0, matched: 0, skipped: 0, blocked: 0, ok: 0, dup: 0, err: 0, questions: 0 };
+  if (!plan) return s;
+  plan.chapters.forEach(rec => {
+    s.questions += rec.questions.length;
+    rec.questions.forEach(it => { if (it.errors.length) s.err++; else if (it.dup) s.dup++; else s.ok++; });
+    if (rec.skipImport) { s.skipped++; return; }
+    if (rec.chapterErrors.length && !rec.skipErrors) { s.blocked++; return; }
+    if (rec.status === 'new') s.newCh++;
+    else if (rec.status === 'ambiguous' && !rec.targetId) { s.blocked++; }
+    else if (rec.status === 'loose' && !rec.confirmed) { s.blocked++; }   // unsure → ask first
+    else s.matched++;
+  });
+  return s;
+}
+function commitMultiImport(ctx) {
+  const plan = ctx.plan;
+  if (!plan) throw new Error('还没有解析结果');
+  const b = getBook(ctx.bookId), co = getCourse(ctx.courseId);
+  if (!b || !co) throw new Error('目标教材/课程不存在');
+  const now = Date.now();
+  const newChapters = [], newQuestions = [];
+  let chaptersCreated = 0, chaptersUsed = 0, added = 0, skippedDup = 0, skippedErr = 0, skippedChapters = 0;
+  const perChapter = [];
+  plan.chapters.forEach(rec => {
+    const line = { name: rec.srcName, created: false, added: 0, dup: 0, err: 0, skipped: false, note: '' };
+    if (rec.skipImport) { skippedChapters++; line.skipped = true; line.note = '按你的选择跳过'; perChapter.push(line); return; }
+    if (rec.status === 'loose' && !rec.confirmed) { skippedChapters++; line.skipped = true; line.note = '匹配关系未确认，已跳过'; perChapter.push(line); return; }
+    const fatalChapterErr = rec.chapterErrors.length && !rec.skipErrors;
+    if (fatalChapterErr) { skippedChapters++; line.skipped = true; line.note = '章节结构有错误'; skippedErr += rec.questions.length; perChapter.push(line); return; }
+    let target = rec.targetId ? getChapter(rec.targetId) : null;
+    if (target && target.courseId !== co.id) {           // never write into another course
+      skippedChapters++; line.skipped = true; line.note = '目标章节不属于当前课程，已跳过'; perChapter.push(line); return;
+    }
+    if (!target) {
+      if (rec.status === 'ambiguous' || (!rec.targetId && rec.status !== 'new' && rec.status !== 'loose')) {
+        skippedChapters++; line.skipped = true; line.note = '匹配关系未确认，已跳过'; perChapter.push(line); return;
+      }
+      target = { id: uid('ch'), bookId: b.id, courseId: co.id, name: rec.srcName, createdAt: now + newChapters.length };
+      newChapters.push(target); chaptersCreated++; line.created = true;
+    } else chaptersUsed++;
+    rec.questions.forEach((it, i) => {
+      if (it.errors.length) { skippedErr++; line.err++; return; }
+      if (it.dup && ctx.opts.skipDup) { skippedDup++; line.dup++; return; }
+      newQuestions.push(Object.assign({ id: uid('q'), bookId: b.id, chapterId: target.id, createdAt: now + added + i }, it.q));
+      added++; line.added++;
+    });
+    perChapter.push(line);
+  });
+  if (!newChapters.length && !newQuestions.length) {
+    return { nothing: true, perChapter: perChapter, added: 0, chaptersCreated: 0, chaptersUsed: chaptersUsed,
+             skippedDup: skippedDup, skippedErr: skippedErr, skippedChapters: skippedChapters };
+  }
+  /* single write */
+  S = Object.assign({}, S, {
+    chapters: S.chapters.concat(newChapters),
+    questions: S.questions.concat(newQuestions)
+  });
+  save();
+  render();
+  toast('已导入 ' + added + ' 题' + (chaptersCreated ? '，新建 ' + chaptersCreated + ' 个章节' : ''), 3200);
+  return { perChapter: perChapter, added: added, chaptersCreated: chaptersCreated, chaptersUsed: chaptersUsed,
+           skippedDup: skippedDup, skippedErr: skippedErr, skippedChapters: skippedChapters };
+}
+
+/* ---------- UI ---------- */
+function openMultiImportSheet(bookId, courseId) { return openMultiPage(bookId, courseId); }
+/* the import lives on its own page: a sheet is too cramped for a long JSON paste
+   and a long per-chapter result list on iPhone / iPad */
+function openMultiPage(bookId, courseId) {
+  const b = getBook(bookId), co = getCourse(courseId);
+  if (!b || !co) { toast('请先进入一个课程'); return; }
+  multiCtx = { bookId: b.id, courseId: co.id, text: '', filename: '', plan: null, error: null, opts: { skipDup: true } };
+  go('multiimport', { bookId: b.id, courseId: co.id });
+}
+function renderMultiBody() {
+  const wrap = document.getElementById('polMultiPage') || document.getElementById('polMultiBody');
+  if (!wrap || !multiCtx) return;
+  const ctx = multiCtx, b = getBook(ctx.bookId), co = getCourse(ctx.courseId);
+  const actions = `<div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="apple-btn small primary" onclick="parseMultiImport()">解析预览</button>
+      <button class="apple-btn small primary" onclick="confirmMultiImport()">导入</button>
+      <button class="apple-btn small" onclick="copyMultiPrompt()">复制 AI 生成指令</button>
+    </div>`;
+  let h = `<div style="display:flex;flex-direction:column;gap:14px;">
+    <div style="padding:12px 14px;background:var(--bg-elev);border:1px solid var(--line);border-radius:var(--radius);font-size:12px;color:var(--ink-secondary);line-height:1.7;">
+      目标：<b>《${esc(b.name)}》 › ${esc(courseTitle(co))}</b>（现有 ${chaptersOfCourse(b.id, co.id).length} 个章节 · ${questionsOfCourse(b.id, co.id).length} 题）<br>
+      粘贴或上传一份包含多个章节的 JSON。章节按<b>规范化后的名称</b>匹配（先名称、再唯一的章节序号），不会跨课程或跨教材导入。默认<b>追加</b>题目，不清空任何内容。
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <button class="apple-btn small" onclick="document.getElementById('polMultiFile').click()">上传 JSON 文件</button>
+      <button class="apple-btn small" onclick="document.getElementById('polMultiFiles').click()">上传多个文件</button>
+      <button class="apple-btn small" onclick="openMultiExample()">查看格式示例</button>
+      <button class="apple-btn small" onclick="clearMultiImport()">清空</button>
+    </div>
+    ${actions}
+    <textarea id="polMultiArea" class="ai-studio-import-textarea" style="min-height:180px;max-height:40vh;overflow:auto;" placeholder='在这里粘贴 JSON，例如：
+{ "format": "politics-quiz-import", "version": "1.0",
+  "book": "${esc(b.name)}", "course": "${esc(courseTitle(co))}",
+  "chapters": [ { "name": "第一章 …", "questions": [ … ] } ] }'>${esc(ctx.text || '')}</textarea>`;
+  if (ctx.error) h += `<div class="pol-note warn">❌ ${esc(ctx.error)}</div>`;
+  if (ctx.plan) { h += multiPlanHTML(ctx, b, co); h += actions; }
+  else h += `<div id="polMultiStatus" class="ai-studio-status">粘贴 JSON（或上传文件）后点「解析预览」，先看匹配结果再导入。</div>`;
+  h += `</div>`;
+  wrap.innerHTML = h;
+  const ta = document.getElementById('polMultiArea');
+  if (ta && ta.value !== ctx.text) ta.value = ctx.text || '';
+}
+function multiPlanHTML(ctx, b, co) {
+  const plan = ctx.plan;
+  const st = multiStats(plan);
+  const existing = chaptersOfCourse(b.id, co.id);
+  const optHtml = (rec) => {
+    const opts = existing.map(c => `<option value="${c.id}" ${rec.targetId === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+    return `<select class="pol-select" style="max-width:190px;" onchange="setMultiTarget(${rec.idx}, this.value)">
+        <option value="__new__" ${!rec.targetId ? 'selected' : ''}>＋ 新建章节</option>${opts}</select>`;
+  };
+  let h = `<div class="pol-note" style="line-height:1.9;">
+      解析完成：<b>${st.newCh}</b> 个章节需要新建 · <b>${st.matched}</b> 个匹配到现有章节 · 题目 <b>${st.ok}</b> 可导入${st.dup ? ' · <b>' + st.dup + '</b> 疑似重复' : ''}${st.err ? ' · <b>' + st.err + '</b> 处格式错误' : ''}${st.skipped ? ' · 跳过 ' + st.skipped + ' 章' : ''}
+      ${plan.notices.length ? '<br>' + esc(plan.notices.join('；')) : ''}
+    </div>`;
+  if (st.blocked) h += `<div class="pol-note warn">⚠️ 有 ${st.blocked} 个章节需要你先确认（选择目标章节 / 处理错误 / 勾选跳过），否则无法导入。</div>`;
+  h += `<label class="pol-check"><input type="checkbox" ${ctx.opts.skipDup ? 'checked' : ''} onchange="multiCtx.opts.skipDup=this.checked;renderMultiBody()">
+    <span>跳过疑似重复的题目（题干 + 答案相同，不会覆盖已有题目）</span></label>`;
+  h += `<div class="pol-plan-list">`;
+  plan.chapters.forEach(rec => {
+    const badge = rec.skipImport ? '<span class="pol-badge skip">已跳过</span>'
+      : rec.chapterErrors.length && !rec.skipErrors ? '<span class="pol-badge err">有错误</span>'
+      : rec.status === 'matched' ? '<span class="pol-badge ok">合并到现有章节</span>'
+      : rec.status === 'loose' ? '<span class="pol-badge warn">按序号匹配，请确认</span>'
+      : rec.status === 'ambiguous' ? '<span class="pol-badge err">需要选择章节</span>'
+      : '<span class="pol-badge new">新建章节</span>';
+    const nOk = rec.questions.filter(q => !q.errors.length && !q.dup).length;
+    const nDup = rec.questions.filter(q => !q.errors.length && q.dup).length;
+    const nErr = rec.questions.filter(q => q.errors.length).length;
+    h += `<div class="pol-plan-row" style="flex-wrap:wrap;">
+      <div class="pol-plan-main">
+        <div class="pol-plan-name">${esc(rec.srcName)}</div>
+        <div class="pol-plan-sub">${rec.questions.length} 题：可导入 ${nOk}${nDup ? ' · 重复 ' + nDup : ''}${nErr ? ' · 错误 ' + nErr : ''}${rec.skipReasons.length ? ' · ' + esc(rec.skipReasons.join('；')) : ''}</div>
+      </div>
+      ${badge}
+      ${!(rec.chapterErrors.length && !rec.skipErrors) ? `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;width:100%;margin-top:8px;">
+        <span class="bar-sub">导入到：</span>${optHtml(rec)}
+        <label class="pol-check" style="margin:0;"><input type="checkbox" ${rec.skipImport ? 'checked' : ''} onchange="setMultiSkip(${rec.idx}, this.checked)"><span>跳过这一章</span></label>
+      </div>` : ''}
+      ${rec.status === 'loose' ? `<label class="pol-check" style="margin-top:8px;width:100%;"><input type="checkbox" ${rec.confirmed ? 'checked' : ''} onchange="setMultiConfirm(${rec.idx}, this.checked)"><span>确认：这一章的题目就导入到上面选择/匹配的章节（名称不完全一致，需要你确认）</span></label>` : ''}
+      ${rec.chapterErrors.length ? `<div class="pol-note warn" style="margin-top:8px;">❌ ${esc(rec.chapterErrors.join('；'))}
+        <label class="pol-check" style="margin-top:6px;"><input type="checkbox" ${rec.skipErrors ? 'checked' : ''} onchange="setMultiSkipErrors(${rec.idx}, this.checked)"><span>跳过这一章继续导入</span></label></div>` : ''}
+      ${nErr ? `<details style="margin-top:8px;width:100%;"><summary class="bar-sub" style="cursor:pointer;">查看 ${nErr} 处题目错误</summary><ul class="err-list">${rec.questions.filter(q => q.errors.length).slice(0, 30).map(q => `<li>第 ${q.idx + 1} 题：${esc(q.errors.join('；'))}</li>`).join('')}</ul></details>` : ''}
+      ${nDup ? `<details style="margin-top:6px;width:100%;"><summary class="bar-sub" style="cursor:pointer;">查看重复题目</summary><ul class="err-list">${rec.questions.filter(q => q.dup).slice(0, 20).map(q => `<li>第 ${q.idx + 1} 题：${esc(String((q.q && q.q.question) || '').slice(0, 40))}…</li>`).join('')}</ul></details>` : ''}
+    </div>`;
+  });
+  h += `</div>
+    <div class="pol-note">确认后：新建 <b>${st.newCh}</b> 个章节，写入约 <b>${st.ok}</b> 道题${st.dup ? '，跳过 ' + st.dup + ' 道重复题' : ''}${st.err ? '，忽略 ' + st.err + ' 处错误数据' : ''}。整个过程一次性提交，失败不会留下半成品。</div>`;
+  return h;
+}
+function setMultiTarget(idx, val) {
+  if (!multiCtx || !multiCtx.plan) return;
+  const rec = multiCtx.plan.chapters.find(r => r.idx === idx); if (!rec) return;
+  rec.targetId = val === '__new__' ? '' : val;
+  rec.status = val === '__new__' ? 'new' : 'matched';
+  rec.confirmed = true;               // the user made the choice explicitly
+  renderMultiBody();
+}
+function setMultiConfirm(idx, v) {
+  if (!multiCtx || !multiCtx.plan) return;
+  const rec = multiCtx.plan.chapters.find(r => r.idx === idx); if (!rec) return;
+  rec.confirmed = !!v; renderMultiBody();
+}
+function setMultiSkip(idx, v) {
+  if (!multiCtx || !multiCtx.plan) return;
+  const rec = multiCtx.plan.chapters.find(r => r.idx === idx); if (!rec) return;
+  rec.skipImport = !!v; renderMultiBody();
+}
+function setMultiSkipErrors(idx, v) {
+  if (!multiCtx || !multiCtx.plan) return;
+  const rec = multiCtx.plan.chapters.find(r => r.idx === idx); if (!rec) return;
+  rec.skipErrors = !!v; renderMultiBody();
+}
+function parseMultiImport() {
+  if (!multiCtx) return;
+  const ta = document.getElementById('polMultiArea');
+  multiCtx.text = ta ? ta.value : '';
+  multiCtx.error = null; multiCtx.plan = null;
+  if (!String(multiCtx.text).trim()) { multiCtx.error = '还没有粘贴 JSON'; renderMultiBody(); return; }
+  let data;
+  const clean = sanitizeJSON(multiCtx.text);
+  try { data = JSON.parse(clean); }
+  catch (e) {
+    try { data = JSON.parse(clean.replace(/[\u201c\u201d]/g, '"')); }
+    catch (e2) { multiCtx.error = 'JSON 格式错误：' + jsonErrorHint(e, clean); renderMultiBody(); return; }
+  }
+  const plan = parseMultiChapterPayload(data, { bookId: multiCtx.bookId, courseId: multiCtx.courseId });
+  if (plan.fatal) { multiCtx.error = plan.fatal; renderMultiBody(); return; }
+  multiCtx.plan = plan;
+  renderMultiBody();
+  toast('解析完成：' + plan.chapters.length + ' 个章节 · ' + plan.totals.questions + ' 道题', 2600);
+}
+function clearMultiImport() {
+  if (!multiCtx) return;
+  multiCtx.text = ''; multiCtx.plan = null; multiCtx.error = null; multiCtx.filename = '';
+  renderMultiBody();
+}
+function handleMultiFile(ev) {
+  const f = ev.target.files && ev.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    ev.target.value = '';
+    if (!multiCtx) return;
+    multiCtx.text = String(r.result || ''); multiCtx.filename = f.name || '';
+    multiCtx.plan = null; multiCtx.error = null;
+    renderMultiBody();
+    parseMultiImport();
+  };
+  r.onerror = () => toast('文件读取失败');
+  r.readAsText(f, 'utf-8');
+}
+/* several files at once → merged into one chapters[] payload */
+function handleMultiFiles(ev) {
+  const files = Array.from(ev.target.files || []);
+  if (!files.length) return;
+  ev.target.value = '';
+  if (!multiCtx) return;
+  const b = getBook(multiCtx.bookId), co = getCourse(multiCtx.courseId);
+  const merged = { format: 'politics-quiz-import', version: '1.0', book: b ? b.name : '', course: co ? courseTitle(co) : '', chapters: [] };
+  let done = 0, failed = [];
+  files.forEach(f => {
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const d = JSON.parse(sanitizeJSON(String(r.result || '')));
+        const chs = Array.isArray(d.chapters) ? d.chapters
+          : (Array.isArray(d.questions) && d.chapter ? [{ name: String(d.chapter), questions: d.questions }] : null);
+        if (!chs) throw new Error('没有 chapters');
+        chs.forEach(c => merged.chapters.push(c));
+      } catch (e) { failed.push(f.name); }
+      done++;
+      if (done === files.length) {
+        multiCtx.text = JSON.stringify(merged, null, 2);
+        multiCtx.filename = files.length + ' 个文件';
+        multiCtx.plan = null; multiCtx.error = null;
+        renderMultiBody();
+        parseMultiImport();
+        if (failed.length) toast('有 ' + failed.length + ' 个文件无法解析：' + failed.join('、'), 4000);
+      }
+    };
+    r.onerror = () => { failed.push(f.name); done++; };
+    r.readAsText(f, 'utf-8');
+  });
+}
+function confirmMultiImport() {
+  const ctx = multiCtx;
+  if (!ctx || !ctx.plan) { toast('请先点「解析预览」', 2600); return; }
+  const ta = document.getElementById('polMultiArea');
+  if (ta && ta.value !== ctx.text) { ctx.text = ta.value; toast('输入框内容已改变，请先重新「解析预览」', 3200); return; }
+  const st = multiStats(ctx.plan);
+  if (st.blocked) { toast('还有 ' + st.blocked + ' 个章节需要确认或勾选跳过', 3400); return; }
+  if (!st.ok && !st.newCh) { toast('没有可导入的内容', 2800); return; }
+  const b = getBook(ctx.bookId), co = getCourse(ctx.courseId);
+  const msg = '把下面这些题目导入《' + b.name + '》 › ' + courseTitle(co) + '？\n\n'
+    + '新建章节：' + st.newCh + ' 个\n合并到现有章节：' + st.matched + ' 个\n'
+    + '写入题目：' + st.ok + ' 道' + (st.dup ? '\n跳过重复：' + st.dup + ' 道' : '') + (st.err ? '\n忽略错误数据：' + st.err + ' 处' : '') + (st.skipped ? '\n跳过章节：' + st.skipped + ' 个' : '')
+    + '\n\n只会追加，不会删除或覆盖任何已有题目、答题记录和复习进度。';
+  if (!confirm(msg)) return;
+  let res;
+  try { res = commitMultiImport(ctx); }
+  catch (e) { toast('导入失败：' + e.message + '（数据未改动）', 4200); return; }
+  const wrap = document.getElementById('polMultiPage') || document.getElementById('polMultiBody');
+  if (wrap) {
+    wrap.innerHTML = `<div class="pol-note" style="line-height:1.9;">
+      ${res.nothing ? 'ℹ️ 没有写入任何内容（没有新增章节，也没有可导入的题目）。' : '✅ 导入完成：新增题目 <b>' + res.added + '</b> 道 · 新建章节 <b>' + res.chaptersCreated + '</b> 个 · 合并到现有章节 <b>' + res.chaptersUsed + '</b> 个<br>跳过重复 <b>' + res.skippedDup + '</b> 道 · 错误数据 <b>' + res.skippedErr + '</b> 处 · 跳过章节 <b>' + res.skippedChapters + '</b> 个'}
+      <div class="pol-plan-list" style="margin-top:10px;">${res.perChapter.map(l => `<div class="pol-plan-row"><div class="pol-plan-main"><div class="pol-plan-name">${esc(l.name)}</div>
+        <div class="pol-plan-sub">${l.created ? '新建章节 · ' : ''}写入 ${l.added} 题${l.dup ? ' · 重复 ' + l.dup : ''}${l.err ? ' · 错误 ' + l.err : ''}${l.skipped ? ' · ' + esc(l.note || '已跳过') : ''}</div></div></div>`).join('')}</div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+        <button class="apple-btn small primary" onclick="go('course',{bookId:'${ctx.bookId}',courseId:'${ctx.courseId}'})">查看章节列表</button>
+        <button class="apple-btn small" onclick="openMultiPage('${ctx.bookId}','${ctx.courseId}')">再导入一批</button>
+      </div></div>`;
+  }
+  multiCtx = null;
+}
+function openMultiExample() {
+  const ctx = multiCtx;
+  const b = ctx ? getBook(ctx.bookId) : null, co = ctx ? getCourse(ctx.courseId) : null;
+  const sample = buildMultiExample(b, co);
+  openGenericSheet('多章节 JSON 格式示例', `
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="pol-note" style="line-height:1.9;">
+        只有 <b>chapters[].name</b> 和 <b>chapters[].questions</b> 是必需的。题目字段与网站现有格式完全一致（type / question / options / answer / explanation …）。
+        options 可以写成数组 <code>["A. …","B. …"]</code>，也可以写成对象 <code>{"A":"…","B":"…"}</code>（会自动映射）。材料分析题用 material + subQuestions。
+      </div>
+      <textarea id="polExampleArea" class="ai-studio-import-textarea" readonly style="min-height:260px;max-height:52vh;">${esc(JSON.stringify(sample, null, 2))}</textarea>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="apple-btn small" onclick="copyText(document.getElementById('polExampleArea').value,'示例已复制')">复制示例</button>
+        <button class="apple-btn small" onclick="fillMultiExample()">填入输入框试用</button>
+      </div>
+    </div>`, [{ text: 'Close', cls: 'primary', onclick: () => closeSheet('genericSheet') }]);
+}
+function fillMultiExample() {
+  if (!multiCtx) return;
+  const b = getBook(multiCtx.bookId), co = getCourse(multiCtx.courseId);
+  multiCtx.text = JSON.stringify(buildMultiExample(b, co), null, 2);
+  multiCtx.plan = null; multiCtx.error = null;
+  closeSheet('genericSheet');
+  renderMultiBody();
+  toast('示例已填入，点「解析预览」试试', 2600);
+}
+function buildMultiExample(b, co) {
+  return {
+    format: 'politics-quiz-import',
+    version: '1.0',
+    book: b ? b.name : '教材名称',
+    course: co ? courseTitle(co) : '课程名称',
+    chapters: [
+      {
+        name: '第一章 毛泽东思想及其历史地位',
+        questions: [
+          { type: 'single', question: '题干示例：毛泽东思想被确立为党的指导思想是在哪次大会？',
+            options: { A: '中共六大', B: '中共七大', C: '中共八大', D: '中共九大' },
+            answer: 'B', explanation: '1945 年中共七大将毛泽东思想确立为党的指导思想并写入党章。' },
+          { type: 'multi', question: '题干示例：毛泽东思想活的灵魂包括哪些基本方面？',
+            options: { A: '实事求是', B: '群众路线', C: '独立自主', D: '改革开放' },
+            answer: ['A', 'B', 'C'], explanation: ['实事求是、群众路线、独立自主是毛泽东思想活的灵魂。'] }
+        ]
+      },
+      {
+        name: '第二章 新民主主义革命理论',
+        questions: [
+          { type: 'short', question: '简答示例：新民主主义革命的三大法宝是什么？',
+            answer: ['统一战线、武装斗争、党的建设。'], explanation: [] },
+          { type: 'material', material: '材料示例：……（材料正文）', question: '阅读材料，回答问题。',
+            subQuestions: [{ question: '(1) 分析材料体现的道理', answer: ['参考答案……。'] },
+                           { question: '(2) 结合材料说明启示', answer: ['参考答案……。'] }] }
+        ]
+      }
+    ]
+  };
+}
+function buildMultiPrompt(b, co) {
+  const sample = JSON.stringify(buildMultiExample(b, co), null, 2);
+  return [
+    '你是一个严格的 JSON 生成器。请把我提供的教材内容/目录转换为「Politics Quiz Hub」可以直接导入的 JSON。',
+    '',
+    '【只输出 JSON】',
+    '- 不要输出 Markdown 代码围栏（不要 ```），不要输出 JSON 以外的任何解释、标题或多余文字。',
+    '- 输出必须是一个完整、可被 JSON.parse 解析的对象；宁可少出几道题，也不要截断 JSON。',
+    '',
+    '【目标教材与课程】',
+    '- 教材：' + (b ? b.name : '（教材名称）'),
+    '- 课程：' + (co ? fmtCourseLabel(co) : '（课程名称）'),
+    '- 只能使用我提供的章节目录，不得虚构教材中不存在的章节；章节名称必须与我提供的目录逐字一致。',
+    '',
+    '【输出格式】',
+    '{',
+    '  "format": "politics-quiz-import",',
+    '  "version": "1.0",',
+    '  "book": "' + (b ? b.name : '教材名称') + '",',
+    '  "course": "' + (co ? courseTitle(co) : '课程名称') + '",',
+    '  "chapters": [',
+    '    { "name": "第一章 ……", "questions": [ { …题目… } ] }',
+    '  ]',
+    '}',
+    '- 每道题必须放在它所属章节的 questions 数组里；没有题目的章节也要保留 name，questions 写成 []。',
+    '',
+    '【题目字段（严格使用以下字段，不要自创字段）】',
+    '1) 单选题：{"type":"single","question":"题干","options":{"A":"…","B":"…","C":"…","D":"…"},"answer":"A","explanation":"解析"}',
+    '   answer 只能是一个大写字母；options 的键必须是 A、B、C…，选项数量 2–8 个。',
+    '2) 多选题：{"type":"multi", … ,"answer":["A","C"]}（answer 至少 2 个正确选项）',
+    '3) 辨析题：{"type":"debate","question":"辨析题干","answer":["参考答案"],"explanation":["解析"]}',
+    '4) 简答题：{"type":"short","question":"简答题干","answer":["参考答案"]}',
+    '5) 论述题：{"type":"essay","question":"论述题干","answer":["参考答案"]}',
+    '6) 材料分析题：{"type":"material","material":"材料正文","question":"总题干（可省略）","subQuestions":[{"question":"(1) …","answer":["参考答案"]}],"explanation":[]}',
+    '  材料分析题必须把材料和它的小题放在同一个对象里，不能拆成多道题。',
+    '- explanation 是解析，写成字符串数组或字符串都可以；没有解析就写 []。',
+    '- 不要在 JSON 里加注释、尾随逗号或未转义的英文双引号。',
+    '',
+    '【内容要求】',
+    '- 只依据我提供的材料、目录或复习资料出题；教材表述优先，不要用外部知识替换我的材料。',
+    '- 不确定的知识点不要伪装成确定事实；宁可不写这道题。',
+    '- 题目数量较多时，优先保证 JSON 完整、结构合法、题目质量，而不是一次写满。',
+    '',
+    '【格式示例（仅供结构参考，不要照抄内容）】',
+    sample,
+    '',
+    '【我提供的教材目录 / 原文】',
+    '（在这里粘贴章节目录或题目原文）'
+  ].join('\n');
+}
+function copyMultiPrompt() {
+  if (!multiCtx) return;
+  const b = getBook(multiCtx.bookId), co = getCourse(multiCtx.courseId);
+  copyText(buildMultiPrompt(b, co), 'AI 生成指令已复制');
+}
+
+/* ================================================================
    BACKUP (whole politics library → one .json file)
    Export: { app, kind:'politics-backup', version, schemaVersion, exportedAt,
              counts, books, chapters, questions, answerLog, wrongBook,
@@ -2827,10 +3850,11 @@ function buildFullBackupPayload() {
     schemaVersion: SCHEMA,
     exportedAt: new Date().toISOString(),
     counts: {
-      books: S.books.length, chapters: S.chapters.length, questions: S.questions.length,
+      books: S.books.length, courses: S.courses.length, chapters: S.chapters.length, questions: S.questions.length,
       answerLog: Object.keys(S.answerLog || {}).length, wrongBook: S.wrongBook.length, due: dueItems().length
     },
     books: cloneData(S.books),
+    courses: cloneData(S.courses),
     chapters: cloneData(S.chapters),
     questions: cloneData(S.questions),
     answerLog: cloneData(S.answerLog),
@@ -2904,6 +3928,20 @@ function normalizeFullBackup(text) {
   }
   if (!books.length && !src.questions.length) { out.error = '备份里没有任何书籍或题目'; return out; }
 
+  /* courses are optional in a backup (older backups simply have none) */
+  const courses = [], courseIds = new Set(), courseBook = {};
+  if (Array.isArray(src.courses)) {
+    src.courses.forEach((co, i) => {
+      if (!co || typeof co !== 'object' || Array.isArray(co)) { out.notes.push('忽略了 ' + (i + 1) + ' 个无效课程'); return; }
+      const cid = co.id == null ? '' : String(co.id);
+      const cbid = co.bookId == null ? '' : String(co.bookId);
+      if (!cid || !bookIds.has(cbid) || courseIds.has(cid)) { out.notes.push('忽略了课程「' + String(co.name || cid) + '」（书籍不存在或 id 重复）'); return; }
+      courseIds.add(cid); courseBook[cid] = cbid;
+      courses.push(Object.assign({}, co, { id: cid, bookId: cbid, name: String(co.name == null ? '' : co.name), short: String(co.short == null ? '' : co.short) }));
+    });
+  }
+
+  let notesCourses = 0;
   const chapters = [], chIds = new Set(), chBook = {};
   for (let i = 0; i < src.chapters.length; i++) {
     const c = src.chapters[i];
@@ -2914,7 +3952,13 @@ function normalizeFullBackup(text) {
     const bid = c.bookId == null ? '' : String(c.bookId);
     if (!bookIds.has(bid)) { out.error = '章节「' + String(c.name || id) + '」指向的书籍不存在（bookId=' + bid + '）'; return out; }
     chIds.add(id); chBook[id] = bid;
-    chapters.push(Object.assign({}, c, { id: id, bookId: bid, name: String(c.name == null ? '' : c.name) }));
+    const rec = Object.assign({}, c, { id: id, bookId: bid, name: String(c.name == null ? '' : c.name) });
+    if (rec.courseId != null) {
+      const cid2 = String(rec.courseId);
+      if (courseIds.has(cid2) && courseBook[cid2] === bid) rec.courseId = cid2;
+      else { delete rec.courseId; notesCourses++; }     // no silent re-assignment
+    }
+    chapters.push(rec);
   }
 
   const questions = [], qIds = new Set(), qChapter = {}, qBook = {};
@@ -2960,6 +4004,7 @@ function normalizeFullBackup(text) {
       wrongBook.push(rec);
     });
   }
+  if (notesCourses) out.notes.push(notesCourses + ' 个章节的课程归属无效，已保留为「未分类」');
   if (fixedBookRefs) out.notes.push('修正了 ' + fixedBookRefs + ' 道题的 bookId（按所属章节归属）');
   if (droppedLogs) out.notes.push('忽略了 ' + droppedLogs + ' 条找不到对应题目的答题记录');
   if (droppedWrongs) out.notes.push('忽略了 ' + droppedWrongs + ' 条无效的错题记录');
@@ -2967,7 +4012,7 @@ function normalizeFullBackup(text) {
 
   out.state = {
     schemaVersion: SCHEMA,
-    books: books, chapters: chapters, questions: questions,
+    books: books, courses: courses, chapters: chapters, questions: questions,
     answerLog: answerLog, wrongBook: wrongBook,
     createdAt: src.createdAt || Date.now(),
     updatedAt: src.updatedAt || Date.now()
@@ -3054,5 +4099,5 @@ function init() {
 init();
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a507be288d2dd77b',t:'MTc5Mjk5OTY5MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a507be288d2dd77b',t:'MTc5Mjk5OTY5MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a507f055cd811ed0',t:'MTc5MzAwMTc0Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
