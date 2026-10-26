@@ -1,0 +1,3058 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Politics Quiz">
+<title>Politics Quiz Hub</title>
+<style>
+/* ===== Base / layout / components: extracted verbatim from index 二 (Quiz Hub) ===== */
+:root {
+  --bg: #FFFFFF;
+  --bg-elev: #F5F5F7;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F0F0F2;
+  --bg-input: #FFFFFF;
+  --bg-popover: #FFFFFF;
+  --ink: #1D1D1F;
+  --ink-secondary: #6E6E73;
+  --ink-tertiary: #8E8E93;
+  --ink-faint: #D1D1D6;
+  --line: #D2D2D7;
+  --line-light: #E5E5EA;
+  --accent: #1D1D1F;
+  --accent-hover: #333333;
+  --green: #1D1D1F;
+  --red: #555555;
+  --orange: #666666;
+  --yellow: #888888;
+  --purple: #555555;
+  --pink: #555555;
+  --teal: #555555;
+
+  --english: #1D1D1F;
+  --english-tint: rgba(0,0,0,0.04);
+  --chinese: #444444;
+  --chinese-tint: rgba(0,0,0,0.03);
+  --politic: #888888;
+  --politic-tint: rgba(0,0,0,0.03);
+
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --shadow: 0 1px 4px rgba(0,0,0,0.06);
+  --shadow-lg: 0 4px 20px rgba(0,0,0,0.1);
+  --blur: saturate(180%) blur(20px);
+
+  --sidebar-w: 240px;
+  --topbar-h: 56px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "PingFang SC", sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+::selection { background: rgba(0,0,0,0.1); }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-thumb { background: #CCC; border-radius: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, textarea, select { font: inherit; color: var(--ink); padding: 6px 10px; }
+input:focus, textarea:focus, select:focus { }
+textarea { resize: vertical; }
+.app {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-rows: var(--topbar-h) 1fr;
+  grid-template-areas: "sidebar topbar" "sidebar content";
+  height: 100vh;
+  overflow: hidden;
+}
+.sidebar {
+  grid-area: sidebar;
+  background: var(--bg-elev);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  padding: 16px 12px;
+  gap: 20px;
+  overflow-y: auto;
+}
+.sidebar-brand {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.capsule-menu {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.capsule-item {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-secondary);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.25,1,0.5,1);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  user-select: none;
+}
+.capsule-item:hover { background: var(--bg-card-hover); color: var(--ink); }
+.capsule-item.active { background: var(--accent); color: #FFFFFF; }
+.capsule-item .icon { font-size: 16px; width: 20px; text-align: center; }
+.sidebar-divider { height: 1px; background: var(--line); margin: -4px 8px 0; opacity: 0.75; flex-shrink: 0; }
+.capsule-item[data-action] { color: var(--ink-secondary); }
+.capsule-item[data-action]:active, .capsule-item[data-module]:active, .capsule-item[data-resource-nav]:active { transform: scale(0.985); }
+.sidebar-ia { display:flex; flex-direction:column; gap:10px; }
+.sidebar-ia-section { display:flex; flex-direction:column; gap:6px; }
+.sidebar-ia-head { padding:0 8px; display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; user-select:none; }
+.sidebar-ia-title { font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-tertiary); }
+.sidebar-ia-caret { width:16px; height:16px; display:flex; align-items:center; justify-content:center; color:var(--ink-tertiary); font-size:11px; transition:transform .2s cubic-bezier(0.25,1,0.5,1); }
+.sidebar-ia-section.collapsed .sidebar-ia-caret { transform:rotate(-90deg); }
+.sidebar-ia-content { max-height:260px; opacity:1; overflow:hidden; transition:max-height .22s cubic-bezier(0.25,1,0.5,1), opacity .18s ease, transform .22s cubic-bezier(0.25,1,0.5,1); }
+.sidebar-ia-section.collapsed .sidebar-ia-content { max-height:0; opacity:0; transform:translateY(-4px); pointer-events:none; }
+.sidebar-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-tertiary);
+  padding: 0 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.topbar {
+  grid-area: topbar;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+}
+.topbar-title {
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.apple-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  background: var(--bg-card);
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.25,1,0.5,1);
+  white-space: nowrap;
+}
+.apple-btn:hover { background: var(--bg-card-hover); border-color: var(--ink-faint); }
+.apple-btn:active { transform: scale(0.97); }
+.apple-btn.primary { background: var(--accent); color: #FFFFFF; border-color: var(--accent); }
+.apple-btn.primary:hover { background: var(--accent-hover); color: #FFFFFF; }
+.apple-btn.danger { color: #1D1D1F; border-color: rgba(0,0,0,0.1); }
+.apple-btn.danger:hover { background: rgba(0,0,0,0.03); }
+.apple-btn.small { padding: 5px 10px; font-size: 11px; }
+.apple-btn.active { background: var(--accent); color: #FFFFFF; border-color: var(--accent); }
+.apple-btn > svg, .apple-btn svg { width: 14px; height: 14px; flex: 0 0 auto; }
+.apple-btn.small > svg, .apple-btn.small svg { width: 12px; height: 12px; }
+.apple-btn.home-start-btn {
+  flex: 0 0 auto;
+  min-width: 0;
+  width: auto;
+  align-self: center;
+  padding: 9px 22px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ai-studio-prompt-box {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  font-size: 11px;
+  color: var(--ink-secondary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  max-height: 180px;
+  overflow-y: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.ai-studio-import-textarea {
+  width: 100%;
+  min-height: 190px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-elev);
+  color: var(--ink);
+  resize: vertical;
+}
+.ai-studio-status {
+  min-height: 38px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line-light);
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--ink-tertiary);
+  line-height: 1.5;
+}
+.content {
+  grid-area: content;
+  overflow-y: auto;
+  padding: 24px 32px 80px;
+}
+.quiz-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.section-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-card);
+  color: var(--ink-secondary);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.12s ease;
+}
+.pill:hover { background: var(--bg-card-hover); color: var(--ink); }
+.pill.active { background: var(--accent); color: #FFFFFF; border-color: var(--accent); }
+.pill .pill-act { opacity: 0.5; font-size: 10px; padding: 0 3px; border-radius: 4px; }
+.pill .pill-act:hover { opacity: 1; }
+.pill.add { background: transparent; border: 1px dashed var(--ink-faint); color: var(--ink-tertiary); }
+.pill.add:hover { border-color: var(--ink-secondary); color: var(--ink); }
+.q-card {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 14px;
+  transition: border-color 0.15s ease;
+}
+.q-card:hover { border-color: var(--ink-faint); }
+.q-meta { font-size: 10px; color: var(--ink-tertiary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+.q-text { font-size: 14px; line-height: 1.7; margin-bottom: 12px; color: var(--ink); }
+.q-options { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.q-opt {
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 13px;
+  cursor: pointer;
+  background: var(--bg-elev);
+  text-align: left;
+  color: var(--ink);
+  transition: all 0.12s ease;
+  user-select: text;
+}
+.q-opt:hover { background: var(--bg-card-hover); border-color: var(--ink-faint); }
+.q-opt.selected { border-color: #1D1D1F; background: rgba(0,0,0,0.03); }
+.q-opt.correct { border-color: #1D1D1F; background: rgba(0,0,0,0.04); color: #1D1D1F; }
+.q-opt.wrong { border-color: #AAA; background: rgba(0,0,0,0.03); color: #999; }
+.q-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.q-actions button {
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  background: var(--bg-card);
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.q-actions button:hover { background: var(--bg-card-hover); }
+.q-actions button:active { transform: scale(0.97); }
+.q-actions button.primary { background: var(--accent); color: #FFFFFF; border-color: var(--accent); }
+.q-actions button.primary:hover { background: var(--accent-hover); }
+.q-explain {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--bg-elev);
+  border-left: 3px solid rgba(0,0,0,0.15);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--ink-secondary);
+  border-radius: var(--radius-sm);
+  display: none;
+}
+.q-explain.show { display: block; }
+.q-status { margin-top: 8px; font-size: 12px; font-weight: 600; }
+.q-status.ok { color: #1D1D1F; }
+.q-status.err { color: #999; }
+@media (max-width: 640px) {
+.quiz-toolbar { gap:6px;padding:8px 10px;flex-wrap:wrap; }
+.quiz-toolbar .apple-btn { font-size:11px;padding:5px 9px;height:30px; }
+.section-pills { gap:4px; }
+.section-pills .pill { font-size:11px;padding:5px 9px; }
+.q-card { padding:12px 10px; }
+.q-text { font-size:14px !important; }
+.q-opt { font-size:13px;padding:10px 10px; }
+.q-actions button { font-size:12px;padding:8px 10px; }
+}
+.res-stat-card {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+  transition: opacity 0.2s cubic-bezier(0.25,1,0.5,1);
+}
+.res-stat-card:hover { opacity: 0.6; }
+.res-stat-card .label { font-size: 11px; font-weight: 600; color: var(--ink-tertiary); text-transform: uppercase; letter-spacing: 0.04em; }
+.res-stat-card .value { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+.res-stat-card .sub { font-size: 11px; color: var(--ink-tertiary); }
+.res-stat-card.countdown { background: var(--bg-card); border-color: var(--line); }
+.res-stat-card.countdown .value { color: var(--ink); }
+body.resource-dragging, body.resource-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.2);
+  backdrop-filter: blur(2px);
+  z-index: 9000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.sheet-overlay.open { display: flex; }
+.sheet {
+  background: #FFFFFF;
+  border: none;
+  border-radius: 16px;
+  width: 560px;
+  max-width: 92vw;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.12);
+  animation: sheetIn 0.22s cubic-bezier(0.25,1,0.5,1);
+}
+.sheet.wide { width: 720px; }
+.sheet.full { width: 100%; height: 100%; max-height: 100%; border-radius: 0; }
+@keyframes sheetIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.sheet-head {
+  padding: 20px 24px 14px;
+  border-bottom: 1px solid var(--line-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sheet-head h3 { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.sheet-head .close-btn {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: transparent;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  color: var(--ink-tertiary);
+  cursor: pointer;
+  transition: color .2s cubic-bezier(0.25,1,0.5,1);
+}
+.sheet-head .close-btn:hover { background: transparent; color: var(--ink); }
+.sheet-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+.sheet-foot {
+  padding: 14px 24px 18px;
+  border-top: 1px solid var(--line-light);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.field { margin-bottom: 18px; }
+.field label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-secondary); margin-bottom: 6px; }
+.field input, .field select, .field textarea {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 14px;
+  color: var(--ink);
+}
+.field input:focus, .field select:focus, .field textarea:focus { }
+.toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1D1D1F;
+  color: #FFFFFF;
+  padding: 10px 20px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 10000;
+  opacity: 0;
+  transition: opacity 0.22s cubic-bezier(0.25,1,0.5,1);
+  pointer-events: none;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
+}
+.toast.show { opacity: 1; }
+.roadmap-status { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: var(--radius-pill); font-size: 10px; font-weight: 800; letter-spacing: 0.01em; border: 1px solid var(--line); background: var(--bg-card); color: var(--ink-secondary); }
+.roadmap-status.not_started { color: var(--ink-tertiary); }
+.roadmap-status.in_progress { color: var(--ink); background: rgba(0,0,0,0.04); }
+.roadmap-status.completed { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+.progress-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-card-hover);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.list-item {
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+}
+.list-item h4 { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--ink-tertiary);
+  font-size: 13px;
+  background: var(--bg-card);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+*:focus { outline: none !important; box-shadow: none !important; }
+*:focus-visible { outline: 1.5px solid rgba(0,0,0,0.15) !important; outline-offset: 1px; box-shadow: none !important; }
+input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible, .apple-btn:focus-visible, input[type="text"]:focus-visible, input[type="number"]:focus-visible, input[type="date"]:focus-visible, input[type="search"]:focus-visible, input[type="password"]:focus-visible, input[type="email"]:focus-visible {
+  outline: none !important; box-shadow: none !important;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--line) !important;
+}
+.app {
+  transition: grid-template-columns 0.28s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.app.sidebar-collapsed {
+  grid-template-columns: 0px 1fr !important;
+}
+.app.sidebar-collapsed .sidebar {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  border-right: none !important;
+  overflow: hidden !important;
+}
+.sidebar {
+  transition: opacity 0.2s ease, padding 0.28s ease, border-color 0.28s ease;
+  overflow-x: hidden;
+}
+body.body-dragging-mod, body.body-dragging-mod * {
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-user-drag: none !important;
+  cursor: grabbing !important;
+}
+html, body, .app, .sidebar, .topbar, .content, .sheet-overlay, .sheet, .sheet-body, .sheet-foot {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+body {
+  overflow-x: hidden;
+}
+.app > *, .topbar > *, .sidebar > *, .content > *, .sheet > *, .sheet-body > *, .q-card > * {
+  min-width: 0;
+}
+.content {
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+img, svg, video, canvas, iframe, table, pre, code {
+  max-width: 100%;
+}
+.q-card, .res-stat-card, .list-item, .empty-state, .sheet {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.apple-btn, .q-actions button, .pill {
+  white-space: normal;
+  word-break: break-word;
+  min-width: 0;
+}
+.topbar-actions, .quiz-toolbar, .q-actions, .sheet-foot, .topbar {
+  flex-wrap: wrap;
+}
+.q-card, .res-stat-card, .list-item {
+  width: 100%;
+  max-width: 100%;
+}
+.quiz-toolbar > *, .topbar-actions > *, .sheet-foot > * {
+  min-width: 0;
+}
+.toast {
+  max-width: min(calc(100vw - 20px), 560px);
+  white-space: normal;
+  text-align: center;
+}
+@media (max-width: 1024px) {
+:root {
+    --sidebar-w: 220px;
+  }
+.app {
+    grid-template-columns: minmax(220px, var(--sidebar-w)) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+.topbar {
+    padding: 12px 18px;
+    gap: 12px;
+    align-items: flex-start;
+  }
+.topbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+.topbar-actions .apple-btn, .quiz-toolbar .apple-btn, .q-actions button, .sheet-foot .apple-btn {
+    flex: 1 1 140px;
+    min-width: 120px;
+  }
+.content {
+    padding: 20px 20px 72px;
+  }
+.sheet {
+    width: min(92vw, 720px);
+  }
+.sheet.wide {
+    width: min(94vw, 820px);
+  }
+}
+@media (max-width: 768px) {
+:root {
+    --topbar-h: auto;
+  }
+html, body {
+    overflow-x: hidden;
+  }
+.app, .app.sidebar-collapsed, .app:not(.sidebar-collapsed) {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      "topbar"
+      "content" !important;
+    position: relative;
+    width: 100%;
+    max-width: 100vw;
+  }
+.topbar, .content {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: 100%;
+  }
+.app::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.28);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 1050;
+  }
+.app:not(.sidebar-collapsed)::before {
+    opacity: 1;
+    pointer-events: auto;
+  }
+.sidebar {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(86vw, 320px);
+    max-width: 320px;
+    z-index: 1100;
+    background: var(--bg-elev);
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-100%);
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transition: transform 0.24s ease, box-shadow 0.24s ease;
+    padding: 16px 12px !important;
+    border-right: 1px solid var(--line) !important;
+  }
+.app:not(.sidebar-collapsed) .sidebar {
+    display: flex !important;
+    transform: translateX(0);
+  }
+.app.sidebar-collapsed .sidebar {
+    display: none !important;
+    transform: translateX(-100%);
+    border-right: 1px solid var(--line) !important;
+  }
+.topbar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    padding: 12px 14px;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 1080;
+  }
+.topbar-title {
+    grid-column: 2;
+    white-space: normal;
+    font-size: 15px;
+  }
+#topbarSidebarToggle {
+    grid-column: 1;
+    margin-right: 0 !important;
+  }
+.topbar-actions {
+    grid-column: 1 / -1;
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+.content {
+    padding: 16px 14px 64px;
+  }
+.quiz-toolbar {
+    align-items: flex-start;
+  }
+.section-pills {
+    width: 100%;
+    flex: 0 0 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+.section-pills::-webkit-scrollbar {
+    display: none;
+  }
+.section-pills .pill {
+    flex: 0 0 auto !important;
+    max-width: min(78vw, 280px);
+    white-space: normal;
+    line-height: 1.35;
+    align-items: flex-start;
+  }
+.section-pills .pill > span:first-child {
+    word-break: break-word;
+  }
+.section-pills .pill.add {
+    min-width: max-content;
+  }
+.sheet-head, .sheet-foot {
+    gap: 10px;
+  }
+.sheet-overlay {
+    padding: 12px;
+    align-items: flex-end;
+  }
+.sheet, .sheet.wide {
+    width: 100%;
+    max-width: 100%;
+    max-height: 88vh;
+    border-radius: 18px 18px 0 0;
+  }
+.sheet-head, .sheet-body, .sheet-foot {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+#genericSheetBody [style*="grid-template-columns:1fr 1fr"], #genericSheetBody [style*="grid-template-columns:1.5fr 1fr"], #genericSheetBody [style*="grid-template-columns:repeat(3,1fr)"], #genericSheetBody [style*="grid-template-columns:repeat(3, 1fr)"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+@media (max-width: 480px) {
+body {
+    font-size: 14px;
+  }
+.topbar {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+.topbar-title {
+    font-size: 14px;
+  }
+input, textarea, select, .field input, .field select, .field textarea {
+    font-size: 16px;
+  }
+.content {
+    padding: 12px 10px 56px;
+  }
+.sidebar {
+    width: min(92vw, 320px);
+  }
+.apple-btn, .q-actions button, .sheet-foot .apple-btn, .topbar-actions .apple-btn, .quiz-toolbar .apple-btn, .pill {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 110px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+#topbarSidebarToggle, .sidebar-brand .apple-btn, .sidebar-section-title .apple-btn {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+.quiz-toolbar, .topbar-actions, .q-actions, .sheet-foot {
+    gap: 6px;
+  }
+.quiz-toolbar, .topbar-actions {
+    width: 100%;
+  }
+.q-card, .res-stat-card, .list-item {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+.q-text {
+    font-size: 14px;
+    line-height: 1.8;
+  }
+.res-stat-card .value {
+    font-size: 22px;
+  }
+.sheet-overlay {
+    padding: 0;
+  }
+.sheet, .sheet.wide {
+    width: 100vw;
+    max-width: 100vw;
+    max-height: 92vh;
+    border-radius: 16px 16px 0 0;
+  }
+.sheet-head h3 {
+    font-size: 14px;
+    line-height: 1.4;
+  }
+#genericSheetBody [style*="min-width:160px"] {
+    min-width: 0 !important;
+  }
+}
+#miniDialog {position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);}
+#miniDialog.open {display:flex;}
+#miniDialogBox {background:var(--bg-card,#fff);border:1px solid var(--line,#ddd);border-radius:16px;padding:24px 20px 16px;min-width:280px;max-width:340px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);display:flex;flex-direction:column;gap:12px;}
+#miniDialogLabel {font-size:14px;font-weight:600;color:var(--ink,#111);line-height:1.4;}
+#miniDialogInput {padding:10px 12px;font-size:14px;border:1px solid var(--line,#ddd);border-radius:10px;background:var(--bg-elev,#f5f5f5);color:var(--ink,#111);outline:none;width:100%;box-sizing:border-box;}
+#miniDialogInput:focus {border-color:var(--accent,#007aff);}
+#miniDialogBtns {display:flex;gap:8px;justify-content:flex-end;}
+#miniDialogBtns button {padding:8px 18px;border-radius:20px;border:none;font-size:13px;font-weight:600;cursor:pointer;}
+#miniDialogCancel {background:var(--bg-elev,#eee);color:var(--ink,#111);}
+#miniDialogOk {background:var(--accent,#007aff);color:#fff;}
+:root {
+  --rc-blue: #007AFF;
+  --rc-green: #34C759;
+  --rc-orange: #FF9500;
+  --rc-red: #FF3B30;
+  --rc-purple: #AF52DE;
+  --rc-teal: #5AC8FA;
+  --rc-amber: #FFCC00;
+  --rc-blue-tint: rgba(0,122,255,0.10);
+  --rc-green-tint: rgba(52,199,89,0.12);
+  --rc-orange-tint: rgba(255,149,0,0.12);
+  --rc-red-tint: rgba(255,59,48,0.10);
+  --rc-purple-tint: rgba(175,82,222,0.10);
+  --rc-gray-tint: rgba(142,142,147,0.12);
+}
+:root {
+  --glass-blur: 24px;
+  --glass-sat: 1.9;
+  --glass-bright: 1.04;
+  --glass-bf: blur(24px) saturate(1.9) brightness(1.04);
+  --glass-bg-fallback: var(--bg-card);
+  --glass-bg: linear-gradient(180deg,
+      color-mix(in srgb, var(--bg-card) 76%, transparent),
+      color-mix(in srgb, var(--bg-card) 58%, transparent));
+  --glass-highlight: rgba(255,255,255,.92);
+  --glass-highlight-soft: rgba(255,255,255,.34);
+  --glass-edge: rgba(255,255,255,.44);
+  --glass-shadow:
+    0 10px 34px rgba(0,0,0,.09),
+    0 1px 3px rgba(0,0,0,.05),
+    inset 0 1px 0 rgba(255,255,255,.92),
+    inset 0 -7px 18px rgba(255,255,255,.34),
+    inset 0 0 0 1px rgba(255,255,255,.44);
+  --glass-radius: 16px;
+
+  
+  --glass-chrome-bg: linear-gradient(180deg,
+      color-mix(in srgb, var(--bg-card) 82%, transparent),
+      color-mix(in srgb, var(--bg-card) 70%, transparent));
+  --glass-chrome-bf: blur(20px) saturate(1.8) brightness(1.03);
+  --glass-chrome-shadow:
+    0 1px 3px rgba(0,0,0,.05),
+    inset 0 1px 0 rgba(255,255,255,.70),
+    inset 0 0 0 1px rgba(255,255,255,.28);
+}
+.sidebar {
+  background: var(--bg-elev);
+  background: var(--glass-chrome-bg);
+  -webkit-backdrop-filter: var(--glass-chrome-bf);
+  backdrop-filter: var(--glass-chrome-bf);
+}
+.topbar {
+  background: var(--bg-card);
+  background: var(--glass-chrome-bg);
+  -webkit-backdrop-filter: var(--glass-chrome-bf);
+  backdrop-filter: var(--glass-chrome-bf);
+}
+.sheet, #miniDialogBox {
+  background: var(--glass-bg-fallback);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-bf);
+  backdrop-filter: var(--glass-bf);
+  box-shadow: var(--glass-shadow);
+}
+#miniDialogBox { border-color: transparent; }
+.sheet-overlay { background: rgba(0,0,0,.22); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+@media (prefers-color-scheme: dark) {
+:root {
+    --bg:#000000; --bg-elev:#1C1C1E; --bg-card:#1C1C1E; --bg-card-hover:#2C2C2E;
+    --bg-input:#2C2C2E; --bg-popover:#2C2C2E;
+    --ink:#FFFFFF; --ink-secondary:#AEAEB2; --ink-tertiary:#8E8E93; --ink-faint:#48484A;
+    --line:#38383A; --line-light:#2C2C2E;
+    --accent:#FFFFFF; --accent-hover:#E5E5EA;
+    --english:#FFFFFF; --english-tint:rgba(255,255,255,.06);
+    --chinese:#D1D1D6; --chinese-tint:rgba(255,255,255,.04);
+    --politic:#8E8E93; --politic-tint:rgba(255,255,255,.03);
+
+    
+    --glass-highlight:rgba(255,255,255,.10);
+    --glass-highlight-soft:rgba(255,255,255,.03);
+    --glass-edge:rgba(255,255,255,.08);
+    --glass-shadow:
+      0 12px 38px rgba(0,0,0,.55),
+      0 1px 3px rgba(0,0,0,.45),
+      inset 0 1px 0 rgba(255,255,255,.10),
+      inset 0 -7px 18px rgba(255,255,255,.03),
+      inset 0 0 0 1px rgba(255,255,255,.08);
+    --glass-chrome-shadow:
+      0 1px 3px rgba(0,0,0,.40),
+      inset 0 1px 0 rgba(255,255,255,.06),
+      inset 0 0 0 1px rgba(255,255,255,.05);
+  }
+.capsule-item.active, .apple-btn.primary, .apple-btn.active, .apple-btn.primary:hover, .pill.active, .q-actions button.primary, #miniDialogOk { color:#1C1C1E; }
+.q-status.ok { color: var(--ink); }
+.apple-btn.danger { color:#FF6961; border-color: rgba(255,255,255,.14); }
+.apple-btn.danger:hover { background: rgba(255,255,255,.06); }
+.toast { background:#F2F2F7; color:#1C1C1E; border-color: rgba(255,255,255,.08); }
+::selection { background: rgba(255,255,255,.18); }
+::-webkit-scrollbar-thumb { background:#48484A; }
+}
+html[data-theme="dark"] {
+  --bg:#000000; --bg-elev:#1C1C1E; --bg-card:#1C1C1E; --bg-card-hover:#2C2C2E;
+  --bg-input:#2C2C2E; --bg-popover:#2C2C2E;
+  --ink:#FFFFFF; --ink-secondary:#AEAEB2; --ink-tertiary:#8E8E93; --ink-faint:#48484A;
+  --line:#38383A; --line-light:#2C2C2E;
+  --accent:#FFFFFF; --accent-hover:#E5E5EA;
+  --english:#FFFFFF; --english-tint:rgba(255,255,255,.06);
+  --chinese:#D1D1D6; --chinese-tint:rgba(255,255,255,.04);
+  --politic:#8E8E93; --politic-tint:rgba(255,255,255,.03);
+  --glass-highlight:rgba(255,255,255,.10); --glass-highlight-soft:rgba(255,255,255,.03); --glass-edge:rgba(255,255,255,.08);
+  --glass-shadow:0 12px 38px rgba(0,0,0,.55),0 1px 3px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.10),inset 0 -7px 18px rgba(255,255,255,.03),inset 0 0 0 1px rgba(255,255,255,.08);
+  --glass-chrome-shadow:0 1px 3px rgba(0,0,0,.40),inset 0 1px 0 rgba(255,255,255,.06),inset 0 0 0 1px rgba(255,255,255,.05);
+}
+html[data-theme="dark"] .capsule-item.active, html[data-theme="dark"] .apple-btn.primary, html[data-theme="dark"] .apple-btn.active, html[data-theme="dark"] .apple-btn.primary:hover, html[data-theme="dark"] .pill.active, html[data-theme="dark"] .q-actions button.primary, html[data-theme="dark"] #miniDialogOk { color:#1C1C1E; }
+html[data-theme="dark"] .q-status.ok { color: var(--ink); }
+html[data-theme="dark"] .apple-btn.danger { color:#FF6961; border-color: rgba(255,255,255,.14); }
+html[data-theme="dark"] .apple-btn.danger:hover { background: rgba(255,255,255,.06); }
+html[data-theme="dark"] .toast { background:#F2F2F7; color:#1C1C1E; border-color: rgba(255,255,255,.08); }
+html[data-theme="dark"] ::selection { background: rgba(255,255,255,.18); }
+html[data-theme="dark"] ::-webkit-scrollbar-thumb { background:#48484A; }
+html[data-theme="light"] {
+  --bg:#FFFFFF; --bg-elev:#F5F5F7; --bg-card:#FFFFFF; --bg-card-hover:#F0F0F2;
+  --bg-input:#FFFFFF; --bg-popover:#FFFFFF;
+  --ink:#1D1D1F; --ink-secondary:#6E6E73; --ink-tertiary:#8E8E93; --ink-faint:#D1D1D6;
+  --line:#D2D2D7; --line-light:#E5E5EA;
+  --accent:#1D1D1F; --accent-hover:#333333;
+  --english:#1D1D1F; --english-tint:rgba(0,0,0,0.04);
+  --chinese:#444444; --chinese-tint:rgba(0,0,0,0.03);
+  --politic:#888888; --politic-tint:rgba(0,0,0,0.03);
+  --glass-highlight:rgba(255,255,255,.60); --glass-highlight-soft:rgba(255,255,255,.20); --glass-edge:rgba(0,0,0,.06);
+  --glass-shadow:0 12px 38px rgba(0,0,0,.12),0 1px 3px rgba(0,0,0,.08),inset 0 1px 0 rgba(255,255,255,.60),inset 0 -7px 18px rgba(255,255,255,.03),inset 0 0 0 1px rgba(0,0,0,.06);
+  --glass-chrome-shadow:0 1px 3px rgba(0,0,0,.08),inset 0 1px 0 rgba(255,255,255,.40),inset 0 0 0 1px rgba(0,0,0,.05);
+}
+html[data-theme="light"] .capsule-item.active, html[data-theme="light"] .apple-btn.primary, html[data-theme="light"] .apple-btn.active, html[data-theme="light"] .pill.active, html[data-theme="light"] .q-actions button.primary, html[data-theme="light"] #miniDialogOk { color:#FFFFFF; }
+html[data-theme="light"] ::selection { background: rgba(0,0,0,0.1); }
+html[data-theme="light"] ::-webkit-scrollbar-thumb { background:#CCC; }
+
+/* ===== Politics-specific additions (only new classes; all tokens come from the original palette) ===== */
+.bar { margin-bottom:16px; padding:16px; background:var(--bg-elev); border:1px solid var(--line); border-radius:var(--radius); }
+.bar-head { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+.bar-title { font-size:20px; font-weight:800; margin:0; color:var(--ink); word-break:break-word; }
+.bar-sub { font-size:12px; color:var(--ink-secondary); margin-top:2px; }
+.bar-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.chips { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:12px; }
+.chip { background:var(--bg-card); padding:4px 12px; border-radius:var(--radius-pill); font-size:12px; font-weight:600; color:var(--ink-secondary); border:1px solid var(--line); white-space:nowrap; }
+.chip.strong { color:var(--ink); border-color:var(--ink); }
+.pre { white-space:pre-wrap; word-break:break-word; }
+.q-material { background:var(--bg-elev); border:1px solid var(--line); border-left:3px solid var(--ink-faint); border-radius:var(--radius-sm); padding:12px 14px; margin-bottom:12px; font-size:13px; line-height:1.85; color:var(--ink); white-space:pre-wrap; word-break:break-word; }
+.q-input { width:100%; min-height:96px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--radius); background:var(--bg-input); color:var(--ink); font-size:14px; line-height:1.7; resize:vertical; margin-bottom:12px; }
+.q-input:focus { outline:none; border-color:var(--ink-secondary); }
+.q-subq { margin-bottom:6px; }
+.q-subq-text { font-size:14px; font-weight:600; line-height:1.7; margin-bottom:6px; white-space:pre-wrap; word-break:break-word; }
+.q-explain-title { font-weight:700; margin-bottom:6px; font-size:13px; color:var(--ink); }
+.q-explain.show { margin-bottom:12px; }
+.q-opt:disabled { cursor:default; }
+.q-opt.selected { border-color:var(--ink); }
+.q-opt.correct { border-color:var(--ink); color:var(--ink); border-width:2px; }
+.q-opt.wrong { border-style:dashed; color:var(--ink-tertiary); }
+.q-status { margin:4px 0 10px; }
+.q-status.err { color:var(--ink-secondary); }
+.q-actions button.on { background:var(--accent); color:#FFFFFF; border-color:var(--accent); }
+.q-actions button:disabled { opacity:.45; cursor:default; }
+@media (prefers-color-scheme: dark) { .q-actions button.on { color:#1C1C1E; } }
+html[data-theme="dark"] .q-actions button.on { color:#1C1C1E; }
+.pol-select { font-size:13px; padding:6px 10px; border-radius:var(--radius-sm); background:var(--bg-card); border:1px solid var(--line); color:var(--ink); max-width:100%; }
+.stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(92px,1fr)); gap:8px; margin-bottom:14px; }
+.stat-grid .res-stat-card { cursor:default; }
+.stat-grid .res-stat-card:hover { opacity:1; }
+.wb-list { display:flex; flex-direction:column; gap:8px; }
+.wb-item { padding:10px 12px; background:var(--bg-card); border:1px solid var(--line-light); border-radius:var(--radius-sm); display:flex; flex-direction:column; gap:6px; }
+.wb-item.due { border-color:var(--ink-faint); background:var(--bg-elev); }
+.wb-row { display:flex; gap:12px; font-size:12px; color:var(--ink-secondary); flex-wrap:wrap; }
+.wb-snip { font-weight:600; font-size:13px; line-height:1.5; word-break:break-word; }
+.wb-explain { font-size:12px; color:var(--ink-secondary); line-height:1.5; background:var(--bg-elev); padding:6px 10px; border-radius:var(--radius-sm); border-left:2px solid var(--accent); display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; white-space:pre-wrap; }
+.wb-btns { display:flex; justify-content:flex-end; align-items:center; gap:6px; flex-wrap:wrap; }
+.sec-title { font-size:13px; font-weight:700; color:var(--ink); margin:12px 0 6px; }
+.nav-count { margin-left:auto; font-size:11px; font-weight:700; padding:1px 8px; border-radius:var(--radius-pill); background:var(--bg-card-hover); color:var(--ink-secondary); }
+.capsule-item.active .nav-count { background:rgba(255,255,255,.22); color:inherit; }
+.err-list { margin:6px 0 0 18px; padding:0; line-height:1.7; }
+.err-list li { margin:0 0 2px; }
+.sub-block { border:1px solid var(--line-light); border-radius:var(--radius-sm); padding:10px; margin-bottom:10px; background:var(--bg-elev); }
+.sub-block textarea { width:100%; margin-bottom:6px; }
+</style>
+</head>
+<body>
+
+<div id="miniDialog">
+  <div id="miniDialogBox">
+    <div id="miniDialogLabel"></div>
+    <input id="miniDialogInput" type="text" autocomplete="off">
+    <div id="miniDialogBtns">
+      <button id="miniDialogCancel">取消</button>
+      <button id="miniDialogOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<div class="app" id="app">
+  <aside class="sidebar">
+    <div class="sidebar-brand" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>Politics Hub</span>
+      <button class="apple-btn small" onclick="toggleSidebar()" title="折叠导航栏" style="padding:4px 6px;color:var(--ink-secondary);"><svg style="width:16px;height:16px;vertical-align:-3px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="9" y1="4" x2="9" y2="20"/></svg></button>
+    </div>
+    <div class="sidebar-ia">
+      <div class="sidebar-ia-section">
+        <div class="sidebar-section-title">Practice</div>
+        <div class="capsule-menu">
+          <div class="capsule-item" id="navHome" data-module="home" onclick="go('home')"><span class="icon" style="font-weight:800;font-size:13px;">B</span> Books</div>
+          <div class="capsule-item" id="navReview" data-module="review" onclick="go('review')"><span class="icon" style="font-weight:800;font-size:13px;">R</span> Review <span class="nav-count" id="navReviewCount" style="display:none">0</span></div>
+        </div>
+      </div>
+      <div class="sidebar-ia-section">
+        <div class="sidebar-section-title">System</div>
+        <div class="capsule-menu">
+          <div class="capsule-item" data-action="backup" onclick="openBackup()"><span class="icon" style="font-weight:800;font-size:13px;">D</span> Backup</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <header class="topbar">
+    <button class="apple-btn small" id="topbarSidebarToggle" onclick="toggleSidebar()" title="展开/折叠导航栏" style="margin-right:8px;padding:6px 8px;color:var(--ink);"><svg style="width:16px;height:16px;vertical-align:-3px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="9" y1="4" x2="9" y2="20"/></svg></button>
+    <div class="topbar-title" id="topbarTitle">Politics Quiz Hub</div>
+    <div class="topbar-actions">
+      <button class="apple-btn" id="topReviewBtn" onclick="go('review')">Review</button>
+    </div>
+  </header>
+
+  <main class="content" id="mainContent"></main>
+</div>
+
+<div class="sheet-overlay" id="genericSheet">
+  <div class="sheet" id="genericSheetInner">
+    <div class="sheet-head">
+      <h3 id="genericSheetTitle">Title</h3>
+      <div class="close-btn" onclick="closeSheet('genericSheet')">x</div>
+    </div>
+    <div class="sheet-body" id="genericSheetBody"></div>
+    <div class="sheet-foot" id="genericSheetFoot"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* ================================================================
+   Politics Quiz Hub — core: constants, storage, helpers, validation
+   Namespace: polquiz_v1* (never touches eng_dashboard_* of the English Quiz Hub)
+   ================================================================ */
+const STORE_KEY   = 'polquiz_v1';
+const BACKUP_KEY  = 'polquiz_v1_backup';
+const UI_KEY      = 'polquiz_v1_ui';
+const SIDEBAR_KEY = 'polquiz_v1_sidebar_collapsed';
+const SCHEMA      = 1;
+// Same Ebbinghaus ladder as the original Quiz Hub wrong book (EBINGHAUS_INTERVALS)
+const INTERVALS   = [1, 3, 7, 15, 30, 60];
+
+const TYPE_LABEL = { single:'单选题', multi:'多选题', debate:'辨析题', short:'简答题', material:'材料分析题', essay:'论述题' };
+const TYPE_ALIAS = {
+  single:'single', singlechoice:'single', radio:'single', '单选':'single', '单选题':'single', '单项选择':'single', '单项选择题':'single',
+  multi:'multi', multiple:'multi', multichoice:'multi', multiplechoice:'multi', '多选':'multi', '多选题':'multi', '多项选择':'multi', '多项选择题':'multi',
+  debate:'debate', '辨析':'debate', '辨析题':'debate',
+  short:'short', shortanswer:'short', '简答':'short', '简答题':'short',
+  material:'material', materialanalysis:'material', '材料分析':'material', '材料分析题':'material', '材料题':'material',
+  essay:'essay', discussion:'essay', '论述':'essay', '论述题':'essay'
+};
+const isObjective = t => t === 'single' || t === 'multi';
+const LETTERS = 'ABCDEFGH';
+
+/* ---------- small helpers (same behaviour as the original) ---------- */
+function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function uid(prefix) { return (prefix || 'id') + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7); }
+function toast(msg, ms) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms || 1800);
+}
+/* LOCAL calendar date. (The original used toISOString() = UTC date, which is off by a day for
+   several hours each morning in UTC+8 — that would break "review tomorrow".) */
+function localISO(d) {
+  d = d || new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function todayISO() { return localISO(new Date()); }
+function addDaysISO(n) { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return localISO(d); }
+function daysUntil(iso) {
+  if (!iso) return 0;
+  const a = new Date(todayISO() + 'T12:00:00'), b = new Date(iso + 'T12:00:00');
+  return Math.round((b - a) / 86400000);
+}
+function fmtNext(iso) {
+  if (!iso) return '';
+  const n = daysUntil(iso);
+  if (n <= 0) return '今天';
+  if (n === 1) return '明天';
+  const p = iso.split('-');
+  return parseInt(p[1], 10) + '月' + parseInt(p[2], 10) + '日';
+}
+/* ---------- FILE SAVE (JSON → device file; Safari / iOS safe) ----------
+   Rules:
+   · the object URL and the temporary <a> are kept alive (60s) — mobile Safari aborts
+     the download if either is revoked/removed right after the click;
+   · where the browser supports it, the File System Access API is used, because it
+     reports whether the file was really written;
+   · iPhone / iPad always get an explicit manual "open → Share → Save to Files"
+     sheet instead of a bare "已导出" toast, because the automatic download is
+     unreliable there (especially in "added to Home Screen" mode).            */
+const PENDING_URLS = [];
+let lastExport = null;
+function extOf(name) { const m = String(name || '').match(/\.([A-Za-z0-9]+)\s*$/); return (m ? m[1] : 'json').toLowerCase(); }
+function isAppleMobile() {
+  const ua = navigator.userAgent || '';
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+  return navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1;   // iPadOS 13+ reports MacIntel
+}
+function isStandaloneApp() {
+  try { if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true; } catch (e) {}
+  return navigator.standalone === true;
+}
+function keepURLAlive(url) {
+  PENDING_URLS.push(url);
+  setTimeout(() => {                       // revoked much later, never synchronously
+    const i = PENDING_URLS.indexOf(url);
+    if (i >= 0) PENDING_URLS.splice(i, 1);
+    try { URL.revokeObjectURL(url); } catch (e) {}
+  }, 60000);
+}
+function humanSize(n) {
+  n = Number(n) || 0;
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+  return (n / 1048576).toFixed(2) + ' MB';
+}
+function setStatusHTML(id, html) { const el = id && document.getElementById(id); if (el) el.innerHTML = html; }
+function saveJSONFile(obj, filename, opts) {
+  opts = opts || {};
+  let text;
+  try { text = JSON.stringify(obj, null, 2); } catch (e) { toast('导出失败：' + e.message, 3500); return null; }
+  const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+  lastExport = { filename: filename, text: text, blob: blob, size: blob.size, at: Date.now(), url: '' };
+  saveBlobFile(blob, filename, opts);
+  return lastExport;
+}
+function saveBlobFile(blob, filename, opts) {
+  opts = opts || {};
+  const statusId = opts.statusId || '';
+  const say = html => setStatusHTML(statusId, html);
+  /* 1) Desktop Chromium / Edge: real save dialog → real "saved" confirmation */
+  if (!opts.noPicker && !isAppleMobile() && typeof window.showSaveFilePicker === 'function') {
+    let picking = null;
+    try {
+      picking = window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: 'JSON 文件', accept: { 'application/json': ['.' + extOf(filename)] } }]
+      });
+    } catch (e) { picking = null; }
+    if (picking && typeof picking.then === 'function') {
+      picking.then(async (handle) => {
+        try {
+          const w = await handle.createWritable();
+          await w.write(blob);
+          await w.close();
+          toast('已保存：' + filename, 3200);
+          say('✅ 已保存到本地文件：<b>' + esc(filename) + '</b>（' + humanSize(blob.size) + '）');
+        } catch (err) { anchorDownload(blob, filename, say, opts); }
+      }).catch((err) => {
+        const nm = err && err.name;
+        if (nm === 'AbortError') { toast('已取消保存', 2600); say('已取消保存。可以再点一次导出。'); return; }
+        anchorDownload(blob, filename, say, opts);    // NotAllowedError / not supported → normal download
+      });
+      return;
+    }
+  }
+  anchorDownload(blob, filename, say, opts);
+}
+function anchorDownload(blob, filename, say, opts) {
+  say = say || function () {};
+  opts = opts || {};
+  let url = '';
+  try { if (window.URL && URL.createObjectURL) url = URL.createObjectURL(blob); } catch (e) { url = ''; }
+  if (url) {
+    if (lastExport) lastExport.url = url;     // reused by the manual-save sheet
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.rel = 'noopener';
+    a.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;';
+    document.body.appendChild(a);
+    let fired = false;
+    try { a.click(); fired = true; }
+    catch (e) {
+      try { fired = a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); }
+      catch (e2) { fired = false; }
+    }
+    keepURLAlive(url);                                       // keep the URL alive while the file is written
+    setTimeout(() => { try { if (a.parentNode) a.parentNode.removeChild(a); } catch (e) {} }, 60000);
+    if (isAppleMobile()) {
+      if (opts.noFallback) {
+        say('已生成文件：<b>' + esc(filename) + '</b>（' + humanSize(blob.size) + '）。');
+        toast('已生成文件：' + filename, 3200);
+        return;
+      }
+      say('已生成文件：<b>' + esc(filename) + '</b>（' + humanSize(blob.size) + '）。iPhone / iPad 若没有出现下载提示，请用弹出的窗口保存。');
+      openSaveFallbackSheet(filename, isStandaloneApp() ? 'ios-standalone' : 'ios');
+      return;
+    }
+    if (fired) {
+      toast('已开始下载：' + filename, 3200);
+      say('✅ 已触发下载：<b>' + esc(filename) + '</b>（' + humanSize(blob.size) + '）。如果浏览器没有出现下载文件，点「保存遇到问题？」用备用方式保存。');
+      return;
+    }
+  }
+  say('这个浏览器没能自动下载文件，请用下面的备用方式保存。' + (filename ? '（' + esc(filename) + '）' : ''));
+  if (opts.noFallback) { toast('浏览器没能自动下载，请重试或改用 Backup 导出备份', 3600); return; }
+  openSaveFallbackSheet(filename, 'blocked');
+}
+/* Manual save: shows the file as a tappable link + the raw JSON, always available. */
+function openSaveFallbackSheet(filename, reason) {
+  const le = lastExport;
+  if (!le) { toast('还没有可保存的文件，请先点一次导出'); return; }
+  const name = filename || le.filename;
+  /* a fresh object URL every time the sheet opens, so a previously revoked URL can't
+     leave a dead link; kept alive for the whole (long) moment the user needs it. */
+  let href = '';
+  try {
+    if (le.blob) { href = URL.createObjectURL(le.blob); keepURLAlive(href); }
+  } catch (e) { href = ''; }
+  if (!href) { try { href = 'data:application/json;charset=utf-8,' + encodeURIComponent(le.text); } catch (e) { href = ''; } }
+  const tip = (reason === 'ios-standalone')
+    ? '这次可能是在「添加到主屏幕」的独立窗口里打开的，独立模式下浏览器常会拦截下载。请点下面的按钮打开文件，再用右上角「分享」→「存储到文件」。'
+    : (reason === 'ios'
+      ? '点下面的按钮打开文件，然后用右上角「分享」→「存储到文件」（或「下载」）保存到「文件」App。'
+      : '如果浏览器拦截了自动下载，点下面的按钮手动保存，或复制 JSON 内容自行保存成 .json 文件。');
+  openGenericSheet('保存 JSON 文件 — ' + name, `
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="padding:12px 14px;background:var(--bg-elev);border:1px solid var(--line);border-radius:var(--radius);font-size:12px;color:var(--ink-secondary);line-height:1.7;">
+        文件已生成：<b>${esc(name)}</b> · ${humanSize(le.size)}<br>${esc(tip)}
+      </div>
+      ${href ? `<a class="apple-btn primary" href="${esc(href)}" download="${esc(name)}" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;padding:10px 14px;">打开 / 保存 ${esc(name)}</a>` : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="apple-btn small" onclick="toggleExportText()">显示 JSON 内容</button>
+        <button class="apple-btn small" onclick="copyExportText()">复制 JSON</button>
+      </div>
+      <textarea id="polExportTextArea" class="ai-studio-import-textarea" style="display:none;min-height:180px;" readonly></textarea>
+      <div class="bar-sub">备用方式：点「显示 JSON 内容」→ 全选复制 → 粘贴进备忘录 / 邮件 / 文本编辑器，保存成 .json 文件即可。</div>
+    </div>`, [{ text: 'Close', cls: 'primary', onclick: () => closeSheet('genericSheet') }]);
+}
+function toggleExportText() {
+  const ta = document.getElementById('polExportTextArea');
+  if (!ta || !lastExport) return;
+  if (ta.style.display === 'none') { ta.value = lastExport.text; ta.style.display = 'block'; ta.focus(); ta.select(); }
+  else { ta.style.display = 'none'; }
+}
+function copyExportText() {
+  if (!lastExport) { toast('还没有可复制的文件'); return; }
+  copyText(lastExport.text, '已复制 JSON，可粘贴保存为 .json 文件');
+}
+function downloadJSON(obj, filename) { return saveJSONFile(obj, filename, {}); }
+function downloadText(text, filename) {
+  /* used by the AI prompt download inside the chapter sheet — it must not replace
+     that sheet with the manual-save sheet on iPhone / iPad. */
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  lastExport = { filename: filename, text: String(text), blob: blob, size: blob.size, at: Date.now(), url: '' };
+  saveBlobFile(blob, filename, { noFallback: true });
+}
+function safeName(s) { return String(s || '').replace(/[^\w\u4e00-\u9fff-]+/g, '_').slice(0, 40) || 'x'; }
+
+/* ---------- dialogs (miniPrompt / sheet: same as the original) ---------- */
+function miniPrompt(label, defaultVal, callback) {
+  const overlay = document.getElementById('miniDialog');
+  const lbl = document.getElementById('miniDialogLabel');
+  const inp = document.getElementById('miniDialogInput');
+  const ok = document.getElementById('miniDialogOk');
+  const cancel = document.getElementById('miniDialogCancel');
+  lbl.textContent = label; inp.value = defaultVal || '';
+  overlay.classList.add('open'); inp.focus(); inp.select();
+  const close = (result) => {
+    overlay.classList.remove('open');
+    ok.onclick = null; cancel.onclick = null; overlay.onclick = null; inp.onkeydown = null;
+    callback(result);
+  };
+  ok.onclick = () => close(inp.value);
+  cancel.onclick = () => close(null);
+  overlay.onclick = (e) => { if (e.target === overlay) close(null); };
+  inp.onkeydown = (e) => { if (e.key === 'Enter') close(inp.value); if (e.key === 'Escape') close(null); };
+}
+function openSheet(id) { document.getElementById(id).classList.add('open'); }
+function closeSheet(id) { document.getElementById(id).classList.remove('open'); }
+function openGenericSheet(title, bodyHTML, buttons) {
+  document.getElementById('genericSheetTitle').textContent = title;
+  document.getElementById('genericSheetBody').innerHTML = bodyHTML;
+  const foot = document.getElementById('genericSheetFoot');
+  foot.innerHTML = '';
+  (buttons || []).forEach(b => {
+    const btn = document.createElement('button');
+    btn.className = 'apple-btn' + (b.cls ? ' ' + b.cls : '');
+    btn.textContent = b.text; btn.onclick = b.onclick;
+    foot.appendChild(btn);
+  });
+  openSheet('genericSheet');
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.sheet-overlay').forEach(ov => {
+    ov.addEventListener('click', e => { if (e.target === ov) closeSheet(ov.id); });
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet('genericSheet'); });
+});
+
+/* ================================================================
+   STATE  (one JSON document → easy to sync across devices later)
+   books[]      {id,name,createdAt}
+   chapters[]   {id,bookId,name,createdAt}
+   questions[]  {id,bookId,chapterId,type,question,options,answer,explanation,material,subQuestions,createdAt}
+   answerLog    { [questionId]: {correct,chosen,text,subTexts,ts} }       (correct:null = subjective, not self-rated yet)
+   wrongBook[]  {id,qId,bookId,chapterId, yourAnswer, completed, reviewStage,nextReviewDate,lastReviewDate,reviewCount,mastered,consecutiveCorrect, ts}
+   ================================================================ */
+function freshState() {
+  return { schemaVersion: SCHEMA, books: [], chapters: [], questions: [], answerLog: {}, wrongBook: [], createdAt: Date.now(), updatedAt: Date.now() };
+}
+let S = freshState();
+let UI = { view: 'home', bookId: null, chapterId: null, reviewBookId: 'all' };
+let cardState = {};   // transient per-card UI state (selection, typed text, retry...)
+let rv = null;        // current review session
+
+function migrateState(d) {
+  const s = freshState();
+  if (!d || typeof d !== 'object') return s;
+  s.books = Array.isArray(d.books) ? d.books : [];
+  s.chapters = Array.isArray(d.chapters) ? d.chapters : [];
+  s.questions = Array.isArray(d.questions) ? d.questions : [];
+  s.answerLog = (d.answerLog && typeof d.answerLog === 'object') ? d.answerLog : {};
+  s.wrongBook = Array.isArray(d.wrongBook) ? d.wrongBook : [];
+  s.createdAt = d.createdAt || Date.now();
+  s.updatedAt = d.updatedAt || Date.now();
+  return s;
+}
+function cleanOrphans() {
+  const bookIds = new Set(S.books.map(b => b.id));
+  S.chapters = S.chapters.filter(c => bookIds.has(c.bookId));
+  const chIds = new Set(S.chapters.map(c => c.id));
+  S.questions = S.questions.filter(q => chIds.has(q.chapterId));
+  const qIds = new Set(S.questions.map(q => q.id));
+  S.wrongBook = S.wrongBook.filter(w => qIds.has(w.qId));
+  Object.keys(S.answerLog).forEach(k => { if (!qIds.has(k)) delete S.answerLog[k]; });
+}
+function loadState() {
+  let data = null, raw = null;
+  try { raw = localStorage.getItem(STORE_KEY); } catch (e) {}
+  if (raw) { try { data = JSON.parse(raw); } catch (e) { data = null; } }
+  if (!data) {
+    try {
+      const b = localStorage.getItem(BACKUP_KEY);
+      if (b) { data = JSON.parse(b); setTimeout(() => toast('主数据读取失败，已从自动备份恢复', 3000), 300); }
+    } catch (e) {}
+  }
+  if (data) S = migrateState(data);
+  try { const u = JSON.parse(localStorage.getItem(UI_KEY) || 'null'); if (u && typeof u === 'object') UI = Object.assign(UI, u); } catch (e) {}
+  cleanOrphans();
+  sanitizeUI();
+}
+function save() {
+  S.updatedAt = Date.now();
+  try {
+    const json = JSON.stringify(S);
+    localStorage.setItem(STORE_KEY, json);
+    try { localStorage.setItem(BACKUP_KEY, json); } catch (_) {}
+  } catch (e) { toast('保存失败：' + e.message + '（请先导出备份）', 4000); }
+}
+function saveUI() { try { localStorage.setItem(UI_KEY, JSON.stringify(UI)); } catch (e) {} }
+function sanitizeUI() {
+  const book = S.books.find(b => b.id === UI.bookId);
+  const ch = S.chapters.find(c => c.id === UI.chapterId);
+  if (UI.view === 'chapter') {
+    if (!ch) UI.view = book ? 'book' : 'home';
+    else UI.bookId = ch.bookId;
+  }
+  if (UI.view === 'book' && !book) UI.view = 'home';
+  if (UI.reviewBookId !== 'all' && !S.books.find(b => b.id === UI.reviewBookId)) UI.reviewBookId = 'all';
+  if (UI.view === 'review' && !rv) { /* list view, fine */ }
+}
+
+/* ---------- lookups ---------- */
+const getBook = id => S.books.find(b => b.id === id) || null;
+const getChapter = id => S.chapters.find(c => c.id === id) || null;
+const getQ = id => S.questions.find(q => q.id === id) || null;
+const chaptersOf = bid => S.chapters.filter(c => c.bookId === bid);
+const questionsOfChapter = cid => S.questions.filter(q => q.chapterId === cid);
+const questionsOfBook = bid => S.questions.filter(q => q.bookId === bid);
+function wrongMap() { const m = {}; S.wrongBook.forEach(w => { m[w.qId] = w; }); return m; }
+const isDone = w => !!(w.mastered || w.completed);
+function isDueItem(w, today) { return !isDone(w) && (!w.nextReviewDate || w.nextReviewDate <= (today || todayISO())); }
+function dueItems(scope) {
+  const today = todayISO();
+  return S.wrongBook.filter(w => {
+    if (!getQ(w.qId) || !isDueItem(w, today)) return false;
+    if (scope && scope.bookId && w.bookId !== scope.bookId) return false;
+    if (scope && scope.chapterId && w.chapterId !== scope.chapterId) return false;
+    return true;
+  });
+}
+function statsFor(qs) {
+  const wm = wrongMap(), today = todayISO();
+  let answered = 0, newC = 0, due = 0;
+  qs.forEach(q => {
+    const log = S.answerLog[q.id], w = wm[q.id];
+    if (log) answered++;
+    if (w && isDueItem(w, today)) due++;
+    if (!log && !w) newC++;
+  });
+  return { total: qs.length, answered, newC, due, pct: qs.length ? Math.round(answered / qs.length * 100) : 0 };
+}
+function qStatus(q, wm, today) {
+  const w = wm[q.id];
+  if (w && !isDone(w)) return isDueItem(w, today) ? { key: 'due', label: '待复习' } : { key: 'sched', label: '错题 · ' + fmtNext(w.nextReviewDate) + '复习' };
+  if (w && isDone(w)) return { key: 'mastered', label: '已掌握' };
+  if (S.answerLog[q.id]) return { key: 'done', label: '已做' };
+  return { key: 'new', label: '新题' };
+}
+
+/* ================================================================
+   IMPORT VALIDATION
+   ================================================================ */
+function sanitizeJSON(raw) {   // based on the original Quiz Hub cleaner, but safe for Chinese text:
+  // curly quotes INSIDE strings (e.g. “两个结合”) and commas inside strings are left untouched.
+  let s = String(raw || '').trim();
+  s = s.replace(/^\uFEFF/, '').trim();
+  const fenced = s.match(/```(?:json|JSON)?\s*([\s\S]*?)```/);
+  if (fenced && fenced[1]) s = fenced[1].trim();
+  s = s.replace(/^\s*json\s*[\r\n]+/i, '').trim();
+  const objStart = s.indexOf('{'), arrStart = s.indexOf('[');
+  let start = -1;
+  if (objStart >= 0 && arrStart >= 0) start = Math.min(objStart, arrStart); else start = Math.max(objStart, arrStart);
+  if (start < 0) return s;
+  s = s.slice(start);
+  const first = s[0], endChar = first === '[' ? ']' : (first === '{' ? '}' : '');
+  if (endChar) {
+    let depth = 0, inStr = false, bs = false, end = -1;
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (bs) { bs = false; continue; }
+      if (ch === '\\') { bs = true; continue; }
+      if (ch === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (ch === first) depth++;
+      else if (ch === endChar) { depth--; if (depth === 0) { end = i; break; } }
+    }
+    if (end >= 0) s = s.slice(0, end + 1);
+  }
+  let res = '', inS = false, bs2 = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inS) {
+      if (bs2) { bs2 = false; res += c; continue; }
+      if (c === '\\') { bs2 = true; res += c; continue; }
+      if (c === '"') { inS = false; res += c; continue; }
+      if (c === '\r') { if (s[i + 1] !== '\n') res += '\\n'; continue; }
+      if (c === '\n') { res += '\\n'; continue; }
+      if (c === '\t') { res += '\\t'; continue; }
+      if (c.charCodeAt(0) < 32) { res += ' '; continue; }
+      res += c; continue;
+    }
+    if (c === '"') { inS = true; res += c; continue; }
+    if (c === ',') {                       // drop trailing commas (outside strings only)
+      let j = i + 1;
+      while (j < s.length && /\s/.test(s[j])) j++;
+      if (s[j] === '}' || s[j] === ']') continue;
+    }
+    if (c === '\u00A0') { res += ' '; continue; }
+    res += c;
+  }
+  return res;
+}
+function toText(v) {                 // string | string[] | number → trimmed string ('' if empty)
+  if (v == null) return '';
+  if (Array.isArray(v)) return v.map(x => String(x == null ? '' : x).trim()).filter(Boolean).join('\n');
+  if (typeof v === 'string') return v.trim();
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  return null;                       // object → invalid
+}
+function normalizeOptions(options, errs) {
+  if (!Array.isArray(options)) { errs.push('缺少 options，或 options 不是数组'); return null; }
+  if (options.length < 2 || options.length > 8) { errs.push('选项数量必须在 2–8 个之间（当前 ' + options.length + ' 个）'); return null; }
+  const out = [];
+  let ok = true;
+  options.forEach((o, k) => {
+    let t = toText(o);
+    if (t) t = t.replace(/\s*\n\s*/g, ' ');
+    if (t === null || t === '') { errs.push('第 ' + (k + 1) + ' 个选项为空或格式不对'); ok = false; return; }
+    const expected = LETTERS[k];
+    const m = t.match(/^\s*([A-Ha-h])\s*[\.．、\)）:：]\s*/);
+    let body = t;
+    if (m) {
+      if (m[1].toUpperCase() !== expected) { errs.push('第 ' + (k + 1) + ' 个选项的字母前缀是 ' + m[1].toUpperCase() + '，但这个位置应该是 ' + expected); ok = false; return; }
+      body = t.slice(m[0].length).trim();
+    }
+    if (!body) { errs.push('选项 ' + expected + ' 没有内容'); ok = false; return; }
+    out.push(expected + '. ' + body);
+  });
+  return ok ? out : null;
+}
+function parseLetters(ans, n, errs) {
+  let str = Array.isArray(ans) ? ans.join('') : String(ans == null ? '' : ans);
+  const rawShown = Array.isArray(ans) ? JSON.stringify(ans) : '"' + str + '"';
+  str = str.toUpperCase().replace(/[\s,，、;；.．\/|]+/g, '');
+  if (!str) { errs.push('缺少 answer（标准答案）'); return null; }
+  if (!/^[A-H]+$/.test(str)) { errs.push('answer ' + rawShown + ' 无法识别，应写成选项字母，例如 "A" 或 "ACD"'); return null; }
+  const uniq = Array.from(new Set(str.split(''))).sort();
+  const bad = uniq.filter(c => LETTERS.indexOf(c) >= n);
+  if (bad.length) { errs.push('answer 中的 ' + bad.join('、') + ' 超出选项范围（共 ' + n + ' 个选项，A–' + LETTERS[n - 1] + '）'); return null; }
+  return uniq;
+}
+/* returns {q, errors:[]}; q is null when errors exist */
+function normalizeQuestion(raw) {
+  const errs = [];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { q: null, errors: ['这一项不是对象（应为 {...}）'] };
+  const tkey = String(raw.type == null ? '' : raw.type).trim().toLowerCase().replace(/[\s_\-]+/g, '');
+  if (!tkey) return { q: null, errors: ['缺少 type（可选：single / multi / debate / short / material / essay，或中文题型名）'] };
+  const type = TYPE_ALIAS[tkey];
+  if (!type) return { q: null, errors: ['无法识别的 type："' + raw.type + '"（可选：single 单选题 / multi 多选题 / debate 辨析题 / short 简答题 / material 材料分析题 / essay 论述题）'] };
+
+  const q = { type, question: '', options: [], answer: '', explanation: '', material: '', subQuestions: [] };
+  const stem = toText(raw.question != null ? raw.question : (raw.stem != null ? raw.stem : raw.title));
+  if (stem === null) errs.push('question 格式不对（应为字符串）');
+  q.question = stem || '';
+  const exp = toText(raw.explanation != null ? raw.explanation : (raw.analysis != null ? raw.analysis : (raw.explain != null ? raw.explain : raw.reason)));
+  if (exp === null) errs.push('explanation 格式不对（应为字符串或字符串数组）'); else q.explanation = exp || '';
+
+  if (type !== 'material' && !q.question) errs.push('缺少 question（题干）');
+
+  if (isObjective(type)) {
+    const opts = normalizeOptions(raw.options, errs);
+    if (opts) {
+      q.options = opts;
+      const letters = parseLetters(raw.answer, opts.length, errs);
+      if (letters) {
+        if (type === 'single' && letters.length !== 1) errs.push('单选题的 answer 只能有 1 个选项，当前是 ' + letters.join(''));
+        if (type === 'multi' && letters.length < 2) errs.push('多选题的 answer 至少要有 2 个正确选项，当前是 ' + letters.join('') + '（如果只有 1 个正确答案，请把 type 改为 single）');
+        q.answer = letters.join('');
+      }
+    }
+  } else if (type === 'material') {
+    const mat = toText(raw.material != null ? raw.material : (raw.passage != null ? raw.passage : raw.content));
+    if (mat === null || !mat) errs.push('材料分析题缺少 material（材料正文）');
+    else q.material = mat;
+    const subs = raw.subQuestions != null ? raw.subQuestions : (raw.questions != null ? raw.questions : raw.subs);
+    if (!Array.isArray(subs) || !subs.length) errs.push('材料分析题缺少 subQuestions（小题数组，至少 1 个）');
+    else {
+      subs.forEach((s, k) => {
+        if (!s || typeof s !== 'object') { errs.push('小题 ' + (k + 1) + ' 不是对象'); return; }
+        const sq = toText(s.question != null ? s.question : s.stem);
+        const sa = toText(s.answer != null ? s.answer : (s.reference != null ? s.reference : s.referenceAnswer));
+        if (!sq) errs.push('小题 ' + (k + 1) + ' 缺少 question');
+        if (!sa) errs.push('小题 ' + (k + 1) + ' 缺少 answer（参考答案）');
+        if (sq && sa) q.subQuestions.push({ question: sq, answer: sa });
+      });
+    }
+  } else {  // debate / short / essay
+    const ans = toText(raw.answer != null ? raw.answer : (raw.reference != null ? raw.reference : raw.referenceAnswer));
+    if (ans === null) errs.push('answer 格式不对（应为字符串或字符串数组）');
+    else if (!ans) errs.push('缺少 answer（' + TYPE_LABEL[type] + '需要参考答案）');
+    else q.answer = ans;
+  }
+  return errs.length ? { q: null, errors: errs } : { q, errors: [] };
+}
+function jsonErrorHint(e, clean) {
+  let msg = e && e.message ? e.message : String(e);
+  const m = msg.match(/position (\d+)/);
+  if (m) {
+    const p = parseInt(m[1], 10);
+    const before = clean.slice(Math.max(0, p - 30), p), after = clean.slice(p, p + 30);
+    const line = clean.slice(0, p).split('\n').length;
+    msg += '（大约在第 ' + line + ' 行附近：…' + before + ' ⟵出错处⟶ ' + after + '…）';
+  }
+  return msg;
+}
+/* Full-batch validation: nothing is imported unless EVERY question passes. */
+function validateImport(rawText) {
+  const out = { ok: false, fatal: null, errors: [], questions: [], counts: {} };
+  const raw = String(rawText || '').trim();
+  if (!raw) { out.fatal = '还没有粘贴 JSON'; return out; }
+  let data, clean = '';
+  clean = sanitizeJSON(raw);
+  try { data = JSON.parse(clean); }
+  catch (e) {
+    let ok2 = false;
+    try { data = JSON.parse(clean.replace(/[\u201c\u201d]/g, '"')); ok2 = true; } catch (e2) {}   // JSON typed with curly quotes as delimiters
+    if (!ok2) { out.fatal = 'JSON 格式错误：' + jsonErrorHint(e, clean) + '。常见原因：缺少逗号/引号、字符串里有未转义的英文双引号 "、多余的逗号。'; return out; }
+  }
+  let list;
+  if (Array.isArray(data)) list = data;
+  else if (data && Array.isArray(data.questions)) list = data.questions;
+  else { out.fatal = '找不到题目数组：顶层应为 {"questions":[...]} 或直接是 [...]'; return out; }
+  if (!list.length) { out.fatal = 'questions 是空数组，没有可导入的题目'; return out; }
+  list.forEach((raw1, i) => {
+    const r = normalizeQuestion(raw1);
+    if (r.q) { out.questions.push(r.q); out.counts[r.q.type] = (out.counts[r.q.type] || 0) + 1; }
+    else {
+      const hint = raw1 && typeof raw1 === 'object' ? String(toText(raw1.question) || toText(raw1.material) || '').slice(0, 24) : '';
+      r.errors.forEach(msg => out.errors.push({ index: i + 1, hint, msg }));
+    }
+  });
+  out.total = list.length;
+  out.ok = out.errors.length === 0;
+  return out;
+}
+function exportQuestionObj(q) {
+  const o = { type: q.type, question: q.question };
+  if (q.type === 'material') { o.material = q.material; o.subQuestions = q.subQuestions.map(s => ({ question: s.question, answer: s.answer })); }
+  else if (isObjective(q.type)) { o.options = q.options.slice(); o.answer = q.type === 'multi' ? q.answer.split('') : q.answer; }
+  else o.answer = q.answer;
+  if (q.explanation) o.explanation = q.explanation;
+  return o;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function statChips(st, opts) {
+  opts = opts || {};
+  return `<div class="chips">
+    <span class="chip">📊 题量: <b>${st.total}</b> 题</span>
+    <span class="chip">✓ 进度: <b>${st.answered}/${st.total}</b> (${st.pct}%)</span>
+    <span class="chip">新题: <b>${st.newC}</b></span>
+    <span class="chip ${st.due ? 'strong' : ''}">待复习: <b>${st.due}</b></span>
+  </div>
+  <div class="progress-bar" style="margin-top:12px;"><div class="progress-fill" style="width:${st.pct}%;background:var(--accent);"></div></div>`;
+}
+function dueBtn(scopeJS, n) {
+  return `<button class="apple-btn small ${n ? 'primary' : ''}" ${n ? '' : 'disabled style="opacity:.45;cursor:default;"'} onclick="startReview(${scopeJS})">Review Due (${n})</button>`;
+}
+
+function updateChrome() {
+  const book = getBook(UI.bookId), ch = getChapter(UI.chapterId);
+  let title = 'Politics Quiz Hub';
+  if (UI.view === 'book' && book) title = book.name;
+  else if (UI.view === 'chapter' && book && ch) title = book.name + ' › ' + ch.name;
+  else if (UI.view === 'review') title = 'Review · 错题复习';
+  else title = 'Politics Quiz Hub · 书籍';
+  document.getElementById('topbarTitle').textContent = title;
+  document.title = title;
+  const due = dueItems().length;
+  const navCount = document.getElementById('navReviewCount');
+  navCount.textContent = due; navCount.style.display = due ? '' : 'none';
+  const btn = document.getElementById('topReviewBtn');
+  btn.textContent = 'Review · 待复习 ' + due;
+  btn.classList.toggle('primary', due > 0);
+  document.getElementById('navHome').classList.toggle('active', UI.view !== 'review');
+  document.getElementById('navReview').classList.toggle('active', UI.view === 'review');
+}
+
+function render() {
+  sanitizeUI();
+  updateChrome();
+  const c = document.getElementById('mainContent');
+  let html = '';
+  if (UI.view === 'book') html = renderBook();
+  else if (UI.view === 'chapter') html = renderChapter();
+  else if (UI.view === 'review') html = renderReview();
+  else html = renderHome();
+  c.innerHTML = html;
+}
+function go(view, ids) {
+  UI.view = view;
+  if (ids) Object.assign(UI, ids);
+  if (view !== 'review') rv = null;
+  if (view === 'review' && !(ids && ids.keepSession)) rv = null;
+  saveUI(); cardState = {};
+  render();
+  document.getElementById('mainContent').scrollTop = 0;
+  collapseSidebarOnMobile();
+}
+
+/* ---------- Home: books ---------- */
+function renderHome() {
+  let h = `<div class="quiz-toolbar"><div class="section-pills"><div class="pill add" onclick="addBook()">+ New Book</div><div class="pill" onclick="openBookImportSheet(null)" title="把其他设备导出的书籍 JSON 作为新书导入">Import Book</div></div></div>`;
+  if (!S.books.length) {
+    return h + `<div class="empty-state">还没有书籍。<br>点击 “+ New Book” 输入书名 → 进入书籍创建章节 → 导入该章节的题目 → 开始刷题。</div>`;
+  }
+  S.books.forEach(b => {
+    const st = statsFor(questionsOfBook(b.id));
+    const nCh = chaptersOf(b.id).length;
+    h += `<div class="bar">
+      <div class="bar-head">
+        <div>
+          <h2 class="bar-title">${esc(b.name)}</h2>
+          <div class="bar-sub">${nCh} 个章节</div>
+        </div>
+        <div class="bar-actions">
+          <button class="apple-btn small primary" onclick="go('book',{bookId:'${b.id}'})">Open</button>
+          <button class="apple-btn small" onclick="exportBookJSON('${b.id}')" title="把这本书导出为 JSON 文件">Export</button>
+          <button class="apple-btn small" onclick="openBookImportSheet('${b.id}')" title="把书籍 JSON 导入这本书，或作为新书导入">Import</button>
+          <button class="apple-btn small" onclick="renameBook('${b.id}')">Rename</button>
+          <button class="apple-btn small danger" onclick="deleteBook('${b.id}')">Delete</button>
+        </div>
+      </div>
+      ${statChips(st)}
+    </div>`;
+  });
+  return h;
+}
+
+/* ---------- Book: chapters ---------- */
+function renderBook() {
+  const b = getBook(UI.bookId); if (!b) return renderHome();
+  const chs = chaptersOf(b.id);
+  const st = statsFor(questionsOfBook(b.id));
+  let h = `<div class="quiz-toolbar"><button class="apple-btn small" onclick="go('home')">← Books</button></div>
+  <div class="bar">
+    <div class="bar-head">
+      <div><h2 class="bar-title">${esc(b.name)}</h2><div class="bar-sub">${chs.length} 个章节 · 先创建章节，再为章节导入题目</div></div>
+      <div class="bar-actions">
+        ${dueBtn(`{bookId:'${b.id}'}`, st.due)}
+        <button class="apple-btn small" onclick="exportBookJSON('${b.id}')" title="把这本书导出为 JSON 文件">Export</button>
+        <button class="apple-btn small" onclick="openBookImportSheet('${b.id}')" title="把书籍 JSON 导入这本书，或作为新书导入">Import</button>
+        <button class="apple-btn small" onclick="renameBook('${b.id}')">Rename</button>
+        <button class="apple-btn small danger" onclick="deleteBook('${b.id}')">Delete</button>
+      </div>
+    </div>
+    ${statChips(st)}
+  </div>
+  <div class="quiz-toolbar"><div class="section-pills"><div class="pill add" onclick="addChapter('${b.id}')">+ New Chapter</div></div></div>`;
+  if (!chs.length) return h + `<div class="empty-state">这本书还没有章节。点击 “+ New Chapter” 创建，例如“马克思主义基本原理”。</div>`;
+  chs.forEach(c => {
+    const cst = statsFor(questionsOfChapter(c.id));
+    h += `<div class="bar">
+      <div class="bar-head">
+        <div><h2 class="bar-title" style="font-size:17px;">${esc(c.name)}</h2></div>
+        <div class="bar-actions">
+          <button class="apple-btn small primary" onclick="go('chapter',{bookId:'${b.id}',chapterId:'${c.id}'})">${cst.total ? 'Practice' : 'Open'}</button>
+          <button class="apple-btn small" onclick="openImportSheet('${c.id}')">Import</button>
+          <button class="apple-btn small" onclick="renameChapter('${c.id}')">Rename</button>
+          <button class="apple-btn small danger" onclick="deleteChapter('${c.id}')">Delete</button>
+        </div>
+      </div>
+      ${cst.total ? statChips(cst) : `<div class="bar-sub" style="margin-top:10px;">还没有题目，点击 Import 导入。</div>`}
+    </div>`;
+  });
+  return h;
+}
+
+/* ---------- Chapter: questions ---------- */
+function chapterBarHTML(c) {
+  const st = statsFor(questionsOfChapter(c.id));
+  return `<div class="bar-head">
+      <div><h2 class="bar-title">${esc(c.name)}</h2><div class="bar-sub">${esc((getBook(c.bookId) || {}).name || '')}</div></div>
+      <div class="bar-actions">
+        ${dueBtn(`{chapterId:'${c.id}'}`, st.due)}
+        <button class="apple-btn small primary" onclick="openImportSheet('${c.id}')">Import</button>
+      </div>
+    </div>${statChips(st)}`;
+}
+function renderChapter() {
+  const c = getChapter(UI.chapterId); if (!c) return renderBook();
+  const b = getBook(c.bookId);
+  const pills = chaptersOf(b.id).map(x => `<div class="pill ${x.id === c.id ? 'active' : ''}" title="${esc(x.name)}">
+      <span onclick="go('chapter',{bookId:'${b.id}',chapterId:'${x.id}'})" style="cursor:pointer">${esc(x.name)}</span>
+      <span class="pill-act" onclick="event.stopPropagation();renameChapter('${x.id}')">/</span>
+      <span class="pill-act" onclick="event.stopPropagation();deleteChapter('${x.id}')">×</span>
+    </div>`).join('') + `<div class="pill add" onclick="addChapter('${b.id}')">+ New Chapter</div>`;
+  const qs = questionsOfChapter(c.id);
+  let h = `<div class="quiz-toolbar"><button class="apple-btn small" onclick="go('book',{bookId:'${b.id}'})">← ${esc(b.name)}</button></div>
+  <div class="quiz-toolbar"><div class="section-pills">${pills}</div></div>
+  <div class="bar" id="chapterBar">${chapterBarHTML(c)}</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+    <div style="font-size:13px;color:var(--ink-secondary);font-weight:600;">${qs.length} 道题</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button class="apple-btn small" onclick="locateCurrentQuestion()" title="定位到第一道未做的题">Locate</button>
+      <button class="apple-btn small primary" style="font-weight:700;" onclick="redoCurrentChapter()">↻ Redo This Chapter</button>
+    </div>
+  </div>`;
+  if (!qs.length) return h + `<div class="empty-state">这个章节还没有题目。点击 “Import” 导入题目。</div>`;
+  qs.forEach((q, i) => { h += renderQuestionCard(q, { mode: 'practice', num: i + 1 }); });
+  h += `<div style="display:flex;justify-content:center;margin-top:24px;"><button class="apple-btn small" onclick="document.getElementById('mainContent').scrollTo({top:0,behavior:'smooth'})" style="border-radius:50%;width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;padding:0;font-weight:800;">Top</button></div>`;
+  return h;
+}
+
+/* ---------- Question card (shared by chapter practice and review) ---------- */
+function getCS(qid) { return cardState[qid] || (cardState[qid] = {}); }
+function refText(s) { return `<div class="pre">${esc(s)}</div>`; }
+function renderQuestionCard(q, ctx) {
+  const cs = getCS(q.id), mode = ctx.mode;
+  let res = null;
+  if (mode === 'practice') { const log = S.answerLog[q.id]; if (log && !cs.retry) res = log; }
+  else if (cs.submitted) res = cs.result;
+  const obj = isObjective(q.type);
+  const chosenSet = new Set(res && res.chosen ? res.chosen.split('') : []);
+  const sel = cs.sel ? cs.sel : new Set();
+  const text = cs.text !== undefined ? cs.text : ((res && res.text) || '');
+  const subTexts = cs.subTexts || (res && res.subTexts) || [];
+  const revealed = !!cs.revealed;
+  const showRef = !!res || revealed;
+
+  let meta;
+  if (mode === 'practice') {
+    const st = qStatus(q, wrongMap(), todayISO());
+    meta = `Q${ctx.num} · ${TYPE_LABEL[q.type]} · ${st.label}`;
+  } else {
+    const c = getChapter(q.chapterId), b = getBook(q.bookId);
+    meta = `${TYPE_LABEL[q.type]} · ${esc(b ? b.name : '')} › ${esc(c ? c.name : '')}`;
+  }
+  let html = `<div class="q-card" data-qid="${q.id}"><div class="q-meta">${mode === 'practice' ? esc(meta) : meta}${q.type === 'multi' ? ' · 请选出所有正确选项' : ''}</div>`;
+
+  if (q.type === 'material') html += `<div class="q-material">${esc(q.material)}</div>`;
+  if (q.question) html += `<div class="q-text pre" style="font-size:15px;font-weight:600;color:var(--ink);margin-bottom:10px;line-height:1.7;">${esc(q.question)}</div>`;
+
+  if (obj) {
+    html += `<div class="q-options">`;
+    q.options.forEach(opt => {
+      const letter = opt[0];
+      let cls = 'q-opt';
+      if (res) { if (q.answer.indexOf(letter) >= 0) cls += ' correct'; else if (chosenSet.has(letter)) cls += ' wrong'; }
+      else if (revealed && q.answer.indexOf(letter) >= 0) cls += ' correct';
+      else if (sel.has(letter)) cls += ' selected';
+      html += `<button class="${cls}" ${mode === 'review' && res ? 'disabled' : ''} onclick="pickOption('${q.id}','${letter}','${mode}')"><span class="pre">${esc(opt)}</span></button>`;
+    });
+    html += `</div>`;
+    if (res) {
+      html += `<div class="q-status ${res.correct ? 'ok' : 'err'}">${res.correct ? '✓ 回答正确' : '✗ 回答错误 · 正确答案：' + q.answer.split('').join('、')}</div>`;
+    }
+    if (showRef) {
+      html += `<div class="q-explain show"><div class="q-explain-title">Explanation (答案解析):</div>${refText(q.explanation || '暂无解析')}</div>`;
+    }
+  } else if (q.type === 'material') {
+    q.subQuestions.forEach((s, i) => {
+      html += `<div class="q-subq"><div class="q-subq-text">${esc(s.question)}</div>
+        <textarea class="q-input" placeholder="写下你的答案（可选）…" oninput="setSubText('${q.id}',${i},this.value)">${esc(subTexts[i] || '')}</textarea>
+        ${showRef ? `<div class="q-explain show"><div class="q-explain-title">参考答案 (Reference Answer):</div>${refText(s.answer)}</div>` : ''}</div>`;
+    });
+    if (showRef && q.explanation) html += `<div class="q-explain show"><div class="q-explain-title">Explanation (答案解析):</div>${refText(q.explanation)}</div>`;
+  } else {
+    html += `<textarea class="q-input" placeholder="写下你的答案（可选）…" oninput="setText('${q.id}',this.value)">${esc(text)}</textarea>`;
+    if (showRef) {
+      html += `<div class="q-explain show"><div class="q-explain-title">参考答案 (Reference Answer):</div>${refText(q.answer)}</div>`;
+      if (q.explanation) html += `<div class="q-explain show"><div class="q-explain-title">Explanation (答案解析):</div>${refText(q.explanation)}</div>`;
+    }
+  }
+
+  // subjective: self-rating (no forced auto-grading)
+  if (!obj && res) {
+    const r = res.correct;
+    const locked = mode === 'review' && r !== null && r !== undefined;
+    html += `<div class="q-status ${r === true ? 'ok' : 'err'}">${r === true ? '✓ 自评：答对了' : (r === false ? '✗ 自评：没答好' : '已提交 · 请对照参考答案自评')}</div>
+      <div class="q-actions" style="margin-bottom:10px;">
+        <button class="${r === true ? 'on' : ''}" ${locked ? 'disabled' : ''} onclick="rateSubjective('${q.id}',true,'${mode}')">我答对了</button>
+        <button class="${r === false ? 'on' : ''}" ${locked ? 'disabled' : ''} onclick="rateSubjective('${q.id}',false,'${mode}')">没答好</button>
+      </div>`;
+  }
+
+  if (mode === 'review' && res && cs.reviewMsg) html += `<div class="bar-sub" style="margin-bottom:8px;">${esc(cs.reviewMsg)}</div>`;
+
+  // actions
+  if (mode === 'practice') {
+    html += `<div class="q-actions">
+      <button class="primary" onclick="submitAnswer('${q.id}')">Submit</button>
+      <button onclick="showAnswer('${q.id}')">Show Answer</button>
+      <button onclick="addToWrongBookQuick('${q.id}')" title="Add to Wrong Book" aria-label="Add to Wrong Book" style="font-size:16px;font-weight:800;">+</button>
+      <button onclick="openQuestionEditor('${q.id}')">Edit</button>
+      <button onclick="deleteQuestion('${q.id}')">Delete</button>
+    </div>`;
+  } else {
+    const w = rv ? S.wrongBook.find(x => x.id === rv.ids[rv.idx]) : null;
+    const answered = !!res && (obj || (res.correct !== null && res.correct !== undefined));
+    if (!res) html += `<div class="q-actions"><button class="primary" onclick="submitAnswer('${q.id}')">Submit</button><button onclick="exitReviewSession()">Back to List</button></div>`;
+    else html += `<div class="q-actions">
+        ${answered && res.correct === true && w && !isDone(w) ? `<button onclick="masterCurrentReview()">Mark Mastered</button>` : ''}
+        ${!obj && !answered ? '' : `<button class="primary" onclick="nextReview()">${rv && rv.idx + 1 >= rv.ids.length ? 'Finish' : 'Next'}</button>`}
+        <button onclick="exitReviewSession()">Back to List</button>
+      </div>`;
+  }
+  return html + `</div>`;
+}
+function refreshCard(qid) {
+  if (UI.view !== 'chapter') { render(); return; }
+  const el = document.querySelector(`.q-card[data-qid="${qid}"]`);
+  const q = getQ(qid);
+  if (!el || !q) { render(); return; }
+  const num = questionsOfChapter(q.chapterId).findIndex(x => x.id === qid) + 1;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = renderQuestionCard(q, { mode: 'practice', num });
+  el.replaceWith(tmp.firstElementChild);
+  const bar = document.getElementById('chapterBar'), c = getChapter(q.chapterId);
+  if (bar && c) bar.innerHTML = chapterBarHTML(c);
+  updateChrome();
+}
+
+/* ---------- Review view ---------- */
+function reviewScope() { return UI.reviewBookId && UI.reviewBookId !== 'all' ? { bookId: UI.reviewBookId } : null; }
+function stageLabel(w) { return isDone(w) ? '已掌握' : (Math.min((w.reviewStage || 0) + 1, INTERVALS.length) + ' / ' + INTERVALS.length); }
+function renderReview() {
+  if (rv) return renderReviewSession();
+  const scope = (rv && rv.scope) || reviewScope();
+  const all = S.wrongBook.filter(w => getQ(w.qId) && (!scope || w.bookId === scope.bookId));
+  const dueList = dueItems(scope);
+  const mastered = all.filter(isDone).length;
+  const total = all.length;
+  const rate = total ? Math.round(mastered / total * 100) : 0;
+  const sorted = all.slice().sort((a, b) => {
+    const ad = isDone(a) ? '9999-12-31' : (a.nextReviewDate || todayISO());
+    const bd = isDone(b) ? '9999-12-31' : (b.nextReviewDate || todayISO());
+    return ad.localeCompare(bd) || ((b.ts || 0) - (a.ts || 0));
+  });
+  const bookOpts = `<option value="all">全部书籍</option>` + S.books.map(b => `<option value="${b.id}" ${UI.reviewBookId === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('');
+  let h = `<div class="bar">
+    <div class="bar-head">
+      <div><h2 class="bar-title">Review · 错题复习</h2><div class="bar-sub">答错的题第二天复习；答对后按 ${INTERVALS.join(' / ')} 天的间隔继续安排，答错则回到第二天。</div></div>
+      <div class="bar-actions"><select class="pol-select" onchange="UI.reviewBookId=this.value;saveUI();render()">${bookOpts}</select></div>
+    </div>
+  </div>
+  <div class="stat-grid">
+    <div class="res-stat-card"><div class="label">错题总数</div><div class="value">${total}</div></div>
+    <div class="res-stat-card"><div class="label">今日待复习</div><div class="value">${dueList.length}</div></div>
+    <div class="res-stat-card"><div class="label">已掌握</div><div class="value">${mastered}</div></div>
+    <div class="res-stat-card"><div class="label">复习中</div><div class="value">${total - mastered}</div></div>
+    <div class="res-stat-card"><div class="label">掌握率</div><div class="value">${rate}%</div></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap;">
+    <button class="apple-btn primary" ${dueList.length ? '' : 'disabled style="opacity:.45;cursor:default;"'} onclick="startReview(${scope ? `{bookId:'${scope.bookId}'}` : 'null'})">Review Due (${dueList.length})</button>
+  </div>`;
+  if (dueList.length) {
+    h += `<div class="sec-title">今日待复习</div><div class="wb-list">${dueList.map((w, i) => wbItemHTML(w, i, true)).join('')}</div>`;
+  } else {
+    h += `<div class="empty-state" style="padding:14px 12px;margin-bottom:14px;">今天没有待复习的题目。</div>`;
+  }
+  h += `<div class="sec-title">全部错题</div><div class="bar-sub" style="margin:-4px 0 8px;">按下次复习日期排序</div>`;
+  h += sorted.length ? `<div class="wb-list">${sorted.map((w, i) => wbItemHTML(w, i, false)).join('')}</div>` : `<div class="empty-state">还没有错题。答错的题目会自动出现在这里。</div>`;
+  return h;
+}
+function userAnswerText(w, q) {
+  if (!w.yourAnswer) return '—';
+  return q && isObjective(q.type) ? String(w.yourAnswer).split('').join('、') : '已作答（自评未掌握）';
+}
+function wbItemHTML(w, idx, due) {
+  const q = getQ(w.qId); if (!q) return '';
+  const b = getBook(w.bookId), c = getChapter(w.chapterId);
+  const snippet = (q.question || q.material || '').replace(/\s+/g, ' ');
+  const badge = isDone(w) ? `<span class="roadmap-status completed" style="text-transform:none;letter-spacing:0;">已掌握</span>`
+    : (isDueItem(w) ? `<span class="roadmap-status in_progress" style="text-transform:none;letter-spacing:0;">今日待复习</span>` : `<span class="roadmap-status not_started" style="text-transform:none;letter-spacing:0;">复习中</span>`);
+  const correct = isObjective(q.type) ? q.answer.split('').join('、') : '见参考答案';
+  return `<div class="wb-item ${due ? 'due' : ''}">
+    <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+      <div class="wb-snip">${idx + 1}. ${esc(snippet.slice(0, 140))}${snippet.length > 140 ? '...' : ''}</div>${badge}
+    </div>
+    <div class="wb-row"><span>${TYPE_LABEL[q.type]}</span><span>${esc(b ? b.name : '')} › ${esc(c ? c.name : '')}</span></div>
+    <div class="wb-row">
+      <span>复习阶段: ${stageLabel(w)}</span>
+      <span>下次复习: ${isDone(w) ? '已完成' : esc(w.nextReviewDate || '今天') + ' (' + (daysUntil(w.nextReviewDate) <= 0 ? '今天' : daysUntil(w.nextReviewDate) + ' 天后') + ')'}</span>
+      <span>已复习: ${w.reviewCount || 0} 次</span>
+    </div>
+    <div class="wb-row"><span>✗ ${esc(userAnswerText(w, q))}</span><span>✓ 正确答案: ${esc(correct)}</span></div>
+    ${q.explanation ? `<div class="wb-explain">${esc(q.explanation)}</div>` : ''}
+    <div class="wb-btns">
+      <button class="apple-btn small" onclick="startReviewOne('${w.id}')">Practice</button>
+      <button class="apple-btn small" onclick="toggleMastered('${w.id}')">${isDone(w) ? 'Unmaster' : 'Mark Mastered'}</button>
+      <button class="apple-btn small danger" onclick="deleteWrongItem('${w.id}')">Delete</button>
+    </div>
+  </div>`;
+}
+function renderReviewSession() {
+  const total = rv.ids.length;
+  if (rv.idx >= total) {
+    const right = rv.results.filter(Boolean).length;
+    return `<div class="bar">
+      <div class="bar-head"><div><h2 class="bar-title">本轮复习完成</h2><div class="bar-sub">共 ${total} 题 · 答对 ${right} 题 · 答错 ${total - right} 题${total - right ? '（答错的题将于明天再次复习）' : ''}</div></div></div>
+      <div class="bar-actions" style="margin-top:12px;"><button class="apple-btn primary" onclick="exitReviewSession()">Back to List</button></div>
+    </div>`;
+  }
+  const w = S.wrongBook.find(x => x.id === rv.ids[rv.idx]);
+  const q = w && getQ(w.qId);
+  if (!w || !q) { rv.idx++; return renderReviewSession(); }
+  const pct = Math.round((rv.idx / total) * 100);
+  const nextDays = INTERVALS[w.reviewStage || 0] || 0;
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:12px;color:var(--ink-secondary);gap:10px;flex-wrap:wrap;">
+      <span>Question ${rv.idx + 1} / ${total}</span>
+      <span>复习阶段: ${stageLabel(w)}&nbsp;&nbsp;|&nbsp;&nbsp;答对后: ${isDone(w) ? '已掌握' : (nextDays ? nextDays + ' 天后再复习' : '完成')}</span>
+    </div>
+    <div class="progress-bar" style="height:6px;margin-bottom:16px;"><div class="progress-fill" style="width:${pct}%;background:var(--accent);"></div></div>
+    ${renderQuestionCard(q, { mode: 'review' })}`;
+}
+
+/* ================================================================
+   BOOKS / CHAPTERS
+   ================================================================ */
+function removeQuestionsWhere(fn) {
+  const ids = new Set(S.questions.filter(fn).map(q => q.id));
+  S.questions = S.questions.filter(q => !ids.has(q.id));
+  S.wrongBook = S.wrongBook.filter(w => !ids.has(w.qId));
+  ids.forEach(id => { delete S.answerLog[id]; delete cardState[id]; });
+  return ids.size;
+}
+function addBook() {
+  miniPrompt('Book name:', '', name => {
+    if (name === null) return;
+    if (!name.trim()) { toast('书名不能为空'); return; }
+    S.books.push({ id: uid('book'), name: name.trim(), createdAt: Date.now() });
+    save(); render(); toast('已创建：' + name.trim());
+  });
+}
+function renameBook(id) {
+  const b = getBook(id); if (!b) return;
+  miniPrompt('Rename book:', b.name, name => {
+    if (name === null) return;
+    if (!name.trim()) { toast('书名不能为空'); return; }
+    b.name = name.trim(); save(); render();
+  });
+}
+function deleteBook(id) {
+  const b = getBook(id); if (!b) return;
+  const nQ = questionsOfBook(id).length, nC = chaptersOf(id).length;
+  if (!confirm('删除书籍「' + b.name + '」？\n将同时删除其中 ' + nC + ' 个章节、' + nQ + ' 道题，以及相关的答题记录和错题。此操作不可恢复。')) return;
+  removeQuestionsWhere(q => q.bookId === id);
+  S.chapters = S.chapters.filter(c => c.bookId !== id);
+  S.books = S.books.filter(x => x.id !== id);
+  if (UI.bookId === id) { UI.bookId = null; UI.chapterId = null; UI.view = 'home'; }
+  save(); saveUI(); render(); toast('已删除');
+}
+function addChapter(bookId) {
+  const b = getBook(bookId); if (!b) return;
+  miniPrompt('Chapter name:', '', name => {
+    if (name === null) return;
+    if (!name.trim()) { toast('章节名不能为空'); return; }
+    const c = { id: uid('ch'), bookId, name: name.trim(), createdAt: Date.now() };
+    S.chapters.push(c); save();
+    if (UI.view === 'chapter') { go('chapter', { bookId, chapterId: c.id }); } else render();
+    toast('已创建章节：' + c.name);
+  });
+}
+function renameChapter(id) {
+  const c = getChapter(id); if (!c) return;
+  miniPrompt('Rename chapter:', c.name, name => {
+    if (name === null) return;
+    if (!name.trim()) { toast('章节名不能为空'); return; }
+    c.name = name.trim(); save(); render();
+  });
+}
+function deleteChapter(id) {
+  const c = getChapter(id); if (!c) return;
+  const n = questionsOfChapter(id).length;
+  if (!confirm('删除章节「' + c.name + '」？\n将同时删除其中 ' + n + ' 道题，以及相关的答题记录和错题。此操作不可恢复。')) return;
+  removeQuestionsWhere(q => q.chapterId === id);
+  S.chapters = S.chapters.filter(x => x.id !== id);
+  if (UI.chapterId === id) { UI.chapterId = null; UI.view = 'book'; }
+  save(); saveUI(); render(); toast('已删除');
+}
+
+/* ================================================================
+   ANSWERING  (Submit → instant right/wrong → wrong answers recorded)
+   ================================================================ */
+function pickOption(qid, letter, mode) {
+  const q = getQ(qid); if (!q) return;
+  const cs = getCS(qid);
+  if (mode === 'practice') {
+    if (S.answerLog[qid] && !cs.retry) { cs.retry = true; cs.sel = new Set(); cs.revealed = false; }
+  } else if (cs.submitted) return;
+  if (!cs.sel) cs.sel = new Set();
+  if (q.type === 'single') cs.sel = new Set([letter]);
+  else { if (cs.sel.has(letter)) cs.sel.delete(letter); else cs.sel.add(letter); }
+  if (mode === 'practice') refreshCard(qid); else render();
+}
+function setText(qid, v) { getCS(qid).text = v; }
+function setSubText(qid, i, v) { const cs = getCS(qid); if (!cs.subTexts) { const log = S.answerLog[qid]; cs.subTexts = (log && log.subTexts ? log.subTexts.slice() : []); } cs.subTexts[i] = v; }
+
+function upsertWrong(q, yourAnswer) {
+  const w = S.wrongBook.find(x => x.qId === q.id);
+  const fresh = {
+    qId: q.id, bookId: q.bookId, chapterId: q.chapterId, yourAnswer: yourAnswer || '-', ts: Date.now(),
+    completed: false, mastered: false, reviewStage: 0, nextReviewDate: addDaysISO(INTERVALS[0]),
+    lastReviewDate: w ? w.lastReviewDate : null, reviewCount: w ? w.reviewCount : 0, consecutiveCorrect: 0
+  };
+  if (w) Object.assign(w, fresh); else S.wrongBook.push(Object.assign({ id: uid('wb') }, fresh));
+}
+function recordResult(q, correct, extra) {
+  S.answerLog[q.id] = Object.assign({ correct, ts: Date.now() }, extra);
+  if (correct === false) upsertWrong(q, extra.chosen || extra.text || '-');
+  save();
+}
+function submitAnswer(qid) {
+  const q = getQ(qid); if (!q) return;
+  const cs = getCS(qid);
+  const inReview = UI.view === 'review' && rv;
+  if (isObjective(q.type)) {
+    const chosen = Array.from(cs.sel || []).sort().join('');
+    if (!chosen) { toast('请先选择答案'); return; }
+    const correct = chosen === q.answer;
+    if (inReview) { reviewResult(q, { correct, chosen }, correct); return; }
+    recordResult(q, correct, { chosen });
+    cs.retry = false; cs.revealed = false;
+    refreshCard(qid);
+    return;
+  }
+  // subjective types: no auto grading — show the reference answer and let me self-rate
+  const log = S.answerLog[qid] || {};
+  const text = cs.text !== undefined ? cs.text : (log.text || '');
+  const subTexts = cs.subTexts || log.subTexts || [];
+  if (inReview) { reviewResult(q, { correct: null, text, subTexts }, null); return; }
+  S.answerLog[qid] = { correct: null, ts: Date.now(), text, subTexts };
+  save();
+  cs.retry = false; cs.revealed = false;
+  refreshCard(qid);
+}
+function rateSubjective(qid, ok, mode) {
+  const q = getQ(qid); if (!q) return;
+  if (mode === 'review') { reviewRate(q, ok); return; }
+  const log = S.answerLog[qid]; if (!log) return;
+  log.correct = ok;
+  if (ok === false) upsertWrong(q, log.text || (log.subTexts || []).join(' ') || '-');
+  save(); refreshCard(qid);
+}
+function showAnswer(qid) {
+  const cs = getCS(qid); cs.revealed = true; refreshCard(qid);
+}
+function addToWrongBookQuick(qid) {
+  const q = getQ(qid); if (!q) return;
+  const w = S.wrongBook.find(x => x.qId === qid);
+  if (w && !isDone(w)) { toast('已在错题本中（' + fmtNext(w.nextReviewDate) + '复习）'); return; }
+  upsertWrong(q, '-');
+  save(); refreshCard(qid); toast('已加入错题本，明天复习');
+}
+function deleteQuestion(qid) {
+  if (!confirm('Delete this question?')) return;
+  S.questions = S.questions.filter(x => x.id !== qid);
+  S.wrongBook = S.wrongBook.filter(w => w.qId !== qid);
+  delete S.answerLog[qid]; delete cardState[qid];
+  save(); render();
+}
+function redoCurrentChapter() {
+  const c = getChapter(UI.chapterId); if (!c) return;
+  const qs = questionsOfChapter(c.id);
+  if (!qs.length) { toast('本章暂无题目'); return; }
+  const answered = qs.filter(q => S.answerLog[q.id]).length;
+  if (!confirm('确定要重新做一遍本章吗？\n将清空本章 ' + qs.length + ' 道题（已答 ' + answered + ' 题）的答题状态。错题本里的复习安排不会被清除。')) return;
+  qs.forEach(q => { delete S.answerLog[q.id]; delete cardState[q.id]; });
+  save(); render(); toast('已重置，可以重新练习本章 ↻');
+}
+function locateCurrentQuestion() {
+  const c = getChapter(UI.chapterId); if (!c) return;
+  const q = questionsOfChapter(c.id).find(x => !S.answerLog[x.id]);
+  if (!q) { toast('本章的题目都做过了'); return; }
+  const el = document.querySelector(`.q-card[data-qid="${q.id}"]`);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ================================================================
+   QUESTION EDITOR (fix typos in imported questions)
+   ================================================================ */
+function fieldTA(label, id, val, rows) { return `<div class="field"><label>${label}</label><textarea id="${id}" rows="${rows || 3}">${esc(val || '')}</textarea></div>`; }
+function subBlockHTML(s) {
+  return `<div class="sub-block"><div class="field"><label>小题题干</label><textarea class="qe-sq" rows="2">${esc(s ? s.question : '')}</textarea></div>
+    <div class="field"><label>参考答案</label><textarea class="qe-sa" rows="4">${esc(s ? s.answer : '')}</textarea></div>
+    <button class="apple-btn small danger" onclick="this.closest('.sub-block').remove()">删除此小题</button></div>`;
+}
+function addSubBlock() { document.getElementById('qeSubs').insertAdjacentHTML('beforeend', subBlockHTML(null)); }
+function openQuestionEditor(qid) {
+  const q = getQ(qid); if (!q) return;
+  const t = q.type;
+  let body = `<div class="bar-sub" style="margin-bottom:12px;">题型：${TYPE_LABEL[t]}（题型不可修改）</div>`;
+  if (t === 'material') body += fieldTA('材料正文', 'qeMaterial', q.material, 7);
+  body += fieldTA(t === 'material' ? '总题干（可选）' : '题干', 'qeQuestion', q.question, 3);
+  if (isObjective(t)) {
+    body += fieldTA('选项（每行一个，字母前缀可省略）', 'qeOptions', q.options.join('\n'), 6);
+    body += `<div class="field"><label>正确答案（例如 A 或 ACD）</label><input id="qeAnswer" value="${esc(q.answer)}"></div>`;
+  } else if (t === 'material') {
+    body += `<div id="qeSubs">${q.subQuestions.map(subBlockHTML).join('')}</div><button class="apple-btn small" style="margin-bottom:14px;" onclick="addSubBlock()">+ 小题</button>`;
+  } else body += fieldTA('参考答案', 'qeAnswerText', q.answer, 7);
+  body += fieldTA('解析（可选）', 'qeExplanation', q.explanation, 4);
+  openGenericSheet('Edit Question', body, [
+    { text: 'Cancel', onclick: () => closeSheet('genericSheet') },
+    { text: 'Save', cls: 'primary', onclick: () => {
+      const raw = { type: t, question: document.getElementById('qeQuestion').value, explanation: document.getElementById('qeExplanation').value };
+      if (t === 'material') {
+        raw.material = document.getElementById('qeMaterial').value;
+        raw.subQuestions = Array.from(document.querySelectorAll('#qeSubs .sub-block')).map(b => ({ question: b.querySelector('.qe-sq').value, answer: b.querySelector('.qe-sa').value }));
+      } else if (isObjective(t)) {
+        raw.options = document.getElementById('qeOptions').value.split('\n').map(x => x.trim()).filter(Boolean);
+        raw.answer = document.getElementById('qeAnswer').value;
+      } else raw.answer = document.getElementById('qeAnswerText').value;
+      const r = normalizeQuestion(raw);
+      if (!r.q) { toast(r.errors[0], 3500); return; }
+      Object.assign(q, r.q);
+      save(); closeSheet('genericSheet'); render(); toast('已保存');
+    } }
+  ]);
+}
+
+/* ================================================================
+   REVIEW  (wrong → tomorrow; correct → Ebbinghaus ladder; wrong again → tomorrow)
+   ================================================================ */
+function handleReview(w, ok) {
+  w.lastReviewDate = todayISO(); w.lastReviewedAt = Date.now();
+  w.reviewCount = (w.reviewCount || 0) + 1;
+  let msg;
+  if (ok) {
+    w.consecutiveCorrect = (w.consecutiveCorrect || 0) + 1;
+    w.reviewStage = (w.reviewStage || 0) + 1;
+    if (w.reviewStage >= INTERVALS.length) {
+      w.mastered = true; w.completed = true; w.nextReviewDate = null;
+      msg = '答对了！已完成全部复习阶段，标记为已掌握。';
+    } else {
+      w.nextReviewDate = addDaysISO(INTERVALS[w.reviewStage]);
+      msg = '答对了！下次复习：' + INTERVALS[w.reviewStage] + ' 天后（' + w.nextReviewDate + '）。';
+    }
+  } else {
+    w.consecutiveCorrect = 0; w.reviewStage = 0; w.mastered = false; w.completed = false;
+    w.nextReviewDate = addDaysISO(INTERVALS[0]);
+    msg = '答错了，明天再复习一次（' + w.nextReviewDate + '）。';
+  }
+  save();
+  return msg;
+}
+function curReviewItem() { return rv ? S.wrongBook.find(x => x.id === rv.ids[rv.idx]) : null; }
+function startReview(scope) {
+  const list = dueItems(scope);
+  if (!list.length) { toast('今天没有待复习的题目'); return; }
+  rv = { ids: list.map(w => w.id), idx: 0, results: [], scope: scope || null };
+  UI.view = 'review'; saveUI(); cardState = {}; render();
+  document.getElementById('mainContent').scrollTop = 0; collapseSidebarOnMobile();
+}
+function startReviewOne(id) {
+  if (!S.wrongBook.find(w => w.id === id)) return;
+  rv = { ids: [id], idx: 0, results: [], scope: null, single: true };
+  cardState = {}; render(); document.getElementById('mainContent').scrollTop = 0;
+}
+function reviewResult(q, result, correctOrNull) {
+  const w = curReviewItem(); if (!w) return;
+  const cs = getCS(q.id);
+  cs.submitted = true; cs.result = result;
+  if (correctOrNull !== null) { cs.reviewMsg = handleReview(w, correctOrNull); rv.results[rv.idx] = correctOrNull; }
+  render();
+}
+function reviewRate(q, ok) {
+  const cs = getCS(q.id), w = curReviewItem();
+  if (!w || !cs.result || (cs.result.correct !== null && cs.result.correct !== undefined)) return;
+  cs.result.correct = ok;
+  cs.reviewMsg = handleReview(w, ok); rv.results[rv.idx] = ok;
+  render();
+}
+function nextReview() {
+  if (!rv) return;
+  rv.idx++; cardState = {}; render();
+  document.getElementById('mainContent').scrollTop = 0;
+}
+function masterCurrentReview() {
+  const w = curReviewItem(); if (!w) return;
+  w.completed = true; w.mastered = true; w.reviewStage = INTERVALS.length; w.nextReviewDate = null; w.lastReviewDate = todayISO();
+  save(); toast('已标记为已掌握'); nextReview();
+}
+function exitReviewSession() { rv = null; cardState = {}; render(); }
+function toggleMastered(id) {
+  const w = S.wrongBook.find(x => x.id === id); if (!w) return;
+  const next = !isDone(w);
+  w.completed = next; w.mastered = next;
+  if (next) { w.reviewStage = INTERVALS.length; w.nextReviewDate = null; w.lastReviewDate = todayISO(); }
+  else { w.reviewStage = 0; w.nextReviewDate = addDaysISO(INTERVALS[0]); w.consecutiveCorrect = 0; }
+  save(); render();
+}
+function deleteWrongItem(id) {
+  if (!confirm('从错题本中删除这道题？（题目本身不会被删除）')) return;
+  S.wrongBook = S.wrongBook.filter(x => x.id !== id);
+  save(); render();
+}
+
+/* ================================================================
+   IMPORT / EXPORT (per chapter)
+   ================================================================ */
+let importTarget = null;
+function buildPrompt(book, chapter) {
+  const BT = '\u0060\u0060\u0060';
+  return [
+    '你是一个严格的 JSON 生成器。请把我粘贴的政治题目转换为「Politics Quiz Hub」可导入的 JSON 数据。',
+    '',
+    '【目标位置】',
+    '- 这批题目将导入：《' + book.name + '》 › ' + chapter.name,
+    '- 系统导入时会强制放入当前选中的章节，你不需要输出书名、章节、id 等字段。',
+    '',
+    '【输出硬性要求】',
+    '1. 最终回复必须是一个完整 JSON 对象，只能以 { 开头，以 } 结尾。',
+    '2. 不要输出 Markdown，不要使用代码块，不要写 ' + BT + 'json，不要加任何额外文字。',
+    '3. 字符串两侧必须是英文双引号 "；字符串内部如果出现引号，请使用中文引号“ ”或「 」，不要使用英文双引号。',
+    '4. 不要使用注释和尾随逗号；不要在字符串里使用 \\n 换行符。',
+    '5. 输出前请自己检查：所有 { } 和 [ ] 都闭合，逗号位置正确。',
+    '',
+    '【顶层结构】',
+    '{ "version": "1.0", "questions": [ 题目1, 题目2, ... ] }',
+    '',
+    '【六种题型】type 只能是 single / multi / debate / short / material / essay 之一',
+    '',
+    '1) 单选题 single：options 为数组（2–8 项，推荐 4 项，以 "A. " "B. " 开头），answer 为一个大写字母',
+    '{ "type": "single", "question": "题干", "options": ["A. 选项", "B. 选项", "C. 选项", "D. 选项"], "answer": "B", "explanation": ["考点：……。", "解析：……。"] }',
+    '',
+    '2) 多选题 multi：options 同上；answer 为大写字母数组，至少 2 个正确选项',
+    '{ "type": "multi", "question": "题干", "options": ["A. 选项", "B. 选项", "C. 选项", "D. 选项"], "answer": ["A", "C", "D"], "explanation": ["解析：……。"] }',
+    '',
+    '3) 辨析题 debate、简答题 short、论述题 essay：不需要 options；answer 为参考答案（字符串，或字符串数组，每个要点一条）',
+    '{ "type": "debate", "question": "辨析题题干", "answer": ["观点判断：……。", "理由：……。"], "explanation": [] }',
+    '{ "type": "short", "question": "简答题题干", "answer": ["要点一：……。", "要点二：……。"], "explanation": [] }',
+    '{ "type": "essay", "question": "论述题题干", "answer": ["……。", "……。"], "explanation": [] }',
+    '',
+    '4) 材料分析题 material：material 为材料正文；question 为总题干（可省略）；subQuestions 为小题数组，每个小题必须有 question 和 answer（参考答案）。材料和它的所有小题必须放在同一道题里，不能拆开。',
+    '{ "type": "material", "material": "材料正文……", "question": "阅读材料，回答问题。", "subQuestions": [ { "question": "(1) 小题一……", "answer": ["参考答案……。"] }, { "question": "(2) 小题二……", "answer": ["参考答案……。"] } ], "explanation": [] }',
+    '',
+    '【其他规则】',
+    '- explanation 是答案解析，输出为字符串数组，每条以句号结尾；没有解析就输出 []。',
+    '- 题目内容、答案必须忠实于我提供的原文，不要擅自改写或编造；如果原文没有参考答案，请根据教材内容补全，并保持简明。',
+    '- 只输出我提供的题目，不要额外增加题目。',
+    '',
+    '请将以下内容转换为严格 JSON：',
+    '[在这里粘贴你的题目]'
+  ].join('\n');
+}
+function copyText(text, okMsg) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => toast(okMsg)).catch(() => toast('Copy failed'));
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.cssText = 'position:fixed;left:-9999px;';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try { document.execCommand('copy'); toast(okMsg); } catch (e) { toast('Copy failed'); }
+    document.body.removeChild(ta);
+  }
+}
+function importTargetInfoHTML() {
+  const c = importTarget && getChapter(importTarget.chapterId), b = c && getBook(c.bookId);
+  if (!c || !b) return '导入目标不存在';
+  return '当前导入目标：<b>《' + esc(b.name) + '》 › ' + esc(c.name) + '</b>（现有 ' + questionsOfChapter(c.id).length + ' 题）。导入会<b>追加</b>到这个章节，不会覆盖已有题目；其他章节、其他书籍不受影响。';
+}
+function openImportSheet(chapterId) {
+  const c = getChapter(chapterId); if (!c) { toast('章节不存在'); return; }
+  const b = getBook(c.bookId);
+  importTarget = { bookId: b.id, chapterId: c.id };
+  const prompt = buildPrompt(b, c);
+  openGenericSheet('Import — ' + b.name + ' › ' + c.name, `
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div id="polImportInfo" style="padding:12px 14px;background:var(--bg-elev);border:1px solid var(--line);border-radius:var(--radius);font-size:12px;color:var(--ink-secondary);line-height:1.6;">${importTargetInfoHTML()}</div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+          <div class="sidebar-section-title" style="padding:0;">Prompt</div>
+          <div style="display:flex;gap:6px;">
+            <button class="apple-btn small primary" onclick="copyImportPrompt()">Copy Prompt</button>
+            <button class="apple-btn small" onclick="downloadImportPrompt()">Download</button>
+          </div>
+        </div>
+        <div class="ai-studio-prompt-box">${esc(prompt)}</div>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+          <div class="sidebar-section-title" style="padding:0;">Import JSON</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="apple-btn small" onclick="document.getElementById('polImportFile').click()">Import JSON File</button>
+            <button class="apple-btn small" onclick="clearImportBox()">清空</button>
+          </div>
+          <input type="file" id="polImportFile" accept=".json,.txt,application/json,text/plain" style="display:none;" onchange="handleImportFile(event)">
+        </div>
+        <textarea id="aiJsonPasteArea" class="ai-studio-import-textarea" placeholder="在这里粘贴 AI 生成的 JSON..."></textarea>
+        <div id="aiImportPreview" class="ai-studio-status" style="margin-top:10px;">校验结果会显示在这里。点击 Preview 只检查不导入；点击 Import 校验通过后才会写入。</div>
+      </div>
+    </div>`, [
+    { text: 'Close', onclick: () => closeSheet('genericSheet') },
+    { text: 'Preview', onclick: previewImport },
+    { text: 'Import', cls: 'primary', onclick: confirmImport }
+  ]);
+}
+function copyImportPrompt() {
+  const c = importTarget && getChapter(importTarget.chapterId); if (!c) return;
+  copyText(buildPrompt(getBook(c.bookId), c), 'Prompt copied');
+}
+function downloadImportPrompt() {
+  const c = importTarget && getChapter(importTarget.chapterId); if (!c) return;
+  downloadText(buildPrompt(getBook(c.bookId), c), 'politics-quiz-prompt.txt');
+  toast('已下载，可直接发给 AI');
+}
+function clearImportBox() {
+  document.getElementById('aiJsonPasteArea').value = '';
+  document.getElementById('aiImportPreview').textContent = '校验结果会显示在这里。';
+}
+function handleImportFile(ev) {
+  const f = ev.target.files && ev.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { document.getElementById('aiJsonPasteArea').value = String(r.result || ''); ev.target.value = ''; previewImport(); };
+  r.onerror = () => toast('文件读取失败');
+  r.readAsText(f, 'utf-8');
+}
+function importReportHTML(v, done) {
+  const box = (inner) => `<div style="background:var(--bg-elev);padding:10px;border-radius:var(--radius);border:1px solid var(--line-light);line-height:1.7;">${inner}</div>`;
+  if (v.fatal) return box('❌ ' + esc(v.fatal));
+  if (!v.ok) {
+    const shown = v.errors.slice(0, 40);
+    return box(`❌ 校验未通过：共 ${v.total} 题，其中 ${new Set(v.errors.map(e => e.index)).size} 题有问题（共 ${v.errors.length} 处错误）。<b>本次不会导入任何题目</b>，请修正后重试。` +
+      `<ul class="err-list">${shown.map(e => `<li>第 ${e.index} 题${e.hint ? '（' + esc(e.hint) + '…）' : ''}：${esc(e.msg)}</li>`).join('')}</ul>` +
+      (v.errors.length > shown.length ? `<div>……另有 ${v.errors.length - shown.length} 处错误未显示</div>` : ''));
+  }
+  const parts = Object.keys(TYPE_LABEL).filter(t => v.counts[t]).map(t => TYPE_LABEL[t] + ' ' + v.counts[t]);
+  return box(done ? `✅ 已导入 ${v.questions.length} 题（${parts.join(' · ')}）。` : `✅ 校验通过：共 ${v.questions.length} 题（${parts.join(' · ')}）。点击 Import 追加到当前章节。`);
+}
+function previewImport() {
+  const v = validateImport(document.getElementById('aiJsonPasteArea').value);
+  document.getElementById('aiImportPreview').innerHTML = importReportHTML(v, false);
+}
+function confirmImport() {
+  const prev = document.getElementById('aiImportPreview');
+  const v = validateImport(document.getElementById('aiJsonPasteArea').value);
+  if (!v.ok) { prev.innerHTML = importReportHTML(v, false); toast('校验未通过，未导入任何题目', 2600); return; }
+  const c = importTarget && getChapter(importTarget.chapterId);
+  if (!c || !getBook(c.bookId)) { toast('导入目标章节已不存在'); return; }
+  const now = Date.now();
+  v.questions.forEach((q, i) => { S.questions.push(Object.assign({ id: uid('q'), bookId: c.bookId, chapterId: c.id, createdAt: now + i }, q)); });
+  save();
+  prev.innerHTML = importReportHTML(v, true);
+  document.getElementById('aiJsonPasteArea').value = '';
+  document.getElementById('polImportInfo').innerHTML = importTargetInfoHTML();
+  render(); toast('已导入 ' + v.questions.length + ' 题');
+}
+/* ================================================================
+   BOOK-LEVEL EXPORT / IMPORT   (one book at a time)
+   File format (kind:'politics-book'), stable and self-contained:
+     { app, kind, version, schemaVersion, exportedAt,
+       book:{id,name,createdAt},
+       chapters:[{id,name,order,createdAt}],
+       questions:[{id,chapterId,bookId,type,question,options,answer,
+                   explanation,material,subQuestions,createdAt}],
+       answerLog:{ [questionId]: {…} },
+       wrongBook:[ {id,qId,bookId,chapterId,…} ] }
+   Import rules:
+     · every id is RE-MAPPED, so collisions with this device's ids can't corrupt data;
+     · "merge into the current book" reuses chapters with the same name and skips
+       questions whose text already exists in that chapter (no duplicates on re-import);
+     · "as a new book" never overwrites an existing book with the same name;
+     · nothing is written until the whole file has been validated & merged in temp
+       objects — a failed import leaves the data untouched.
+   ================================================================ */
+function cloneData(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
+function buildBookPayload(bookId) {
+  const b = getBook(bookId); if (!b) return null;
+  const chs = chaptersOf(b.id);
+  const chIds = {}; chs.forEach(c => { chIds[c.id] = true; });
+  const qs = S.questions.filter(q => chIds[q.chapterId]);
+  const qIds = {}; qs.forEach(q => { qIds[q.id] = true; });
+  const answerLog = {};
+  Object.keys(S.answerLog).forEach(k => { if (qIds[k]) answerLog[k] = cloneData(S.answerLog[k]); });
+  const wrongBook = S.wrongBook.filter(w => qIds[w.qId]).map(cloneData);
+  return {
+    app: 'politics-quiz-hub',
+    kind: 'politics-book',
+    version: '1.0',
+    schemaVersion: SCHEMA,
+    exportedAt: new Date().toISOString(),
+    book: { id: b.id, name: b.name, createdAt: b.createdAt || null },
+    chapters: chs.map((c, i) => ({ id: c.id, name: c.name, order: i, createdAt: c.createdAt || null })),
+    questions: qs.map(q => ({
+      id: q.id, chapterId: q.chapterId, bookId: q.bookId, type: q.type,
+      question: q.question || '',
+      options: Array.isArray(q.options) ? q.options.slice() : [],
+      answer: q.answer == null ? '' : q.answer,
+      explanation: q.explanation || '',
+      material: q.material || '',
+      subQuestions: Array.isArray(q.subQuestions) ? q.subQuestions.map(s => ({ question: s.question, answer: s.answer })) : [],
+      createdAt: q.createdAt || null
+    })),
+    answerLog: answerLog,
+    wrongBook: wrongBook
+  };
+}
+function exportBookJSON(bookId) {
+  const b = getBook(bookId); if (!b) { toast('书籍不存在'); return; }
+  const payload = buildBookPayload(bookId);
+  const filename = 'politics_' + safeName(b.name) + '_' + todayISO() + '.json';
+  saveJSONFile(payload, filename, { statusId: 'polBookImportStatus' });
+}
+/* ---------- validation of a book file (returns a temp, validated payload) ---------- */
+function normalizeBookPayload(data) {
+  const out = { ok: false, error: null, warnings: [], bookName: '', chapters: [], questions: [], answerLog: {}, wrongBook: {} };
+  if (!data || typeof data !== 'object' || Array.isArray(data)) { out.error = '文件顶层不是对象（应为本功能导出的书籍 JSON）'; return out; }
+  if (data.passages || data.grammarQuestions || data.quizSets || data.roadmap) { out.error = '这是英语 Quiz Hub 的数据，不能导入到政治版'; return out; }
+  if (data.kind === 'politics-backup' || (Array.isArray(data.books) && Array.isArray(data.chapters))) {
+    out.error = '这是「全量备份」文件（包含整库数据）。请用侧边栏 Backup → Import Backup 恢复整库，而不是按单本书导入。';
+    return out;
+  }
+  let bookName = '';
+  let chSrc = null, qSrc = null, logSrc = null, wrongSrc = null;
+  if (data.book && typeof data.book === 'object' && !Array.isArray(data.book)) {
+    bookName = String(data.book.name == null ? '' : data.book.name).trim();
+    chSrc = data.chapters; qSrc = data.questions; logSrc = data.answerLog; wrongSrc = data.wrongBook;
+  } else if (typeof data.book === 'string' && Array.isArray(data.questions) && !Array.isArray(data.chapters)) {
+    /* legacy single-chapter export: { book:'书名', chapter:'章节名', questions:[AI 题目…] } */
+    bookName = String(data.book).trim();
+    const chName = String(data.chapter == null ? '' : data.chapter).trim() || '导入的章节';
+    chSrc = [{ id: '__legacy_ch_1', name: chName }];
+    qSrc = data.questions.map(q => (q && typeof q === 'object') ? Object.assign({}, q, { chapterId: '__legacy_ch_1' }) : q);
+  } else if (typeof data.bookName === 'string' && Array.isArray(data.questions)) {
+    bookName = String(data.bookName).trim();
+    chSrc = data.chapters; qSrc = data.questions; logSrc = data.answerLog; wrongSrc = data.wrongBook;
+  } else {
+    out.error = '找不到书籍信息：文件里没有 book / chapters / questions（只接受本功能导出的单本书文件）';
+    return out;
+  }
+  if (!bookName) bookName = '导入的书籍';
+  if (!Array.isArray(chSrc) || !chSrc.length) { out.error = '文件里没有章节（chapters 为空）'; return out; }
+  if (!Array.isArray(qSrc) || !qSrc.length) { out.error = '文件里没有题目（questions 为空）'; return out; }
+
+  const idMap = new Map(), usedIds = new Set();
+  for (let i = 0; i < chSrc.length; i++) {
+    const c = chSrc[i];
+    if (!c || typeof c !== 'object') { out.warnings.push('第 ' + (i + 1) + ' 个章节不是对象，已跳过'); continue; }
+    const name = String(c.name != null ? c.name : (c.title != null ? c.title : '')).trim();
+    if (!name) { out.warnings.push('第 ' + (i + 1) + ' 个章节没有名称，已跳过'); continue; }
+    let sid = c.id == null ? '' : String(c.id);
+    if (!sid || usedIds.has(sid)) sid = '__ch_' + i + '_' + Math.random().toString(36).slice(2, 6);
+    usedIds.add(sid);
+    const rec = { srcId: sid, name: name, createdAt: c.createdAt || null };
+    out.chapters.push(rec);
+    idMap.set(sid, rec);
+    if (c.id != null) idMap.set(String(c.id), rec);
+  }
+  if (!out.chapters.length) { out.error = '文件里没有可用的章节'; return out; }
+
+  const qIdMap = new Map();
+  for (let i = 0; i < qSrc.length; i++) {
+    const raw = qSrc[i];
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { out.error = '第 ' + (i + 1) + ' 道题不是对象'; return out; }
+    const chRef = raw.chapterId != null ? raw.chapterId : (raw.chapterKey != null ? raw.chapterKey : raw.chapter);
+    let ch = chRef == null ? null : idMap.get(String(chRef));
+    if (!ch && raw.chapterName != null) ch = out.chapters.find(x => x.name === String(raw.chapterName).trim()) || null;
+    if (!ch && out.chapters.length === 1) ch = out.chapters[0];        // tolerance for 1-chapter files
+    if (!ch) { out.error = '第 ' + (i + 1) + ' 道题引用的章节在文件里不存在（' + (chRef == null ? '空' : String(chRef)) + '）'; return out; }
+    const r = normalizeQuestion(raw);
+    if (!r.q) { out.error = '第 ' + (i + 1) + ' 道题数据不完整：' + r.errors.slice(0, 3).join('；'); return out; }
+    const sid = raw.id == null ? '' : String(raw.id);
+    const rec = { srcId: sid, chSrcId: ch.srcId, q: r.q };
+    out.questions.push(rec);
+    if (sid && !qIdMap.has(sid)) qIdMap.set(sid, rec);
+  }
+  if (!out.questions.length) { out.error = '文件里没有可导入的题目'; return out; }
+
+  if (logSrc && typeof logSrc === 'object' && !Array.isArray(logSrc)) {
+    Object.keys(logSrc).forEach(k => {
+      const rec = qIdMap.get(String(k)), v = logSrc[k];
+      if (!rec || !v || typeof v !== 'object' || Array.isArray(v)) return;
+      out.answerLog[String(k)] = cloneData(v);
+    });
+  }
+  if (Array.isArray(wrongSrc)) {
+    const seen = new Set();
+    wrongSrc.forEach(w => {
+      if (!w || typeof w !== 'object') return;
+      const key = String(w.qId);
+      if (!qIdMap.get(key) || seen.has(key)) return;
+      seen.add(key);
+      out.wrongBook[key] = cloneData(w);
+    });
+  }
+  out.bookName = bookName;
+  out.ok = true;
+  return out;
+}
+/* ---------- merge / create (everything is prepared in temp arrays first) ---------- */
+function questionSig(chapterNameKey, q) {
+  const body = String(q.question || q.material || '').replace(/\s+/g, '').slice(0, 200);
+  const ans = Array.isArray(q.answer) ? q.answer.join('') : String(q.answer == null ? '' : q.answer);
+  return chapterNameKey + '|' + q.type + '|' + body + '|' + ans.replace(/\s+/g, '');
+}
+function applyBookImport(target, p, mode, newName) {
+  const now = Date.now();
+  const chIdMap = new Map();            // source chapter id -> chapter id on this device
+  const qIdMap = new Map();             // source question id -> question id on this device
+  const newChapters = [], newQuestions = [], newLogs = {}, newWrongs = [];
+  let book = null;
+  if (mode === 'new') {
+    book = { id: uid('book'), name: newName, createdAt: now };
+    p.chapters.forEach((ch, i) => {
+      const id = uid('ch');
+      chIdMap.set(ch.srcId, id);
+      newChapters.push({ id: id, bookId: book.id, name: ch.name, createdAt: ch.createdAt || now + i });
+    });
+  } else {
+    book = target;
+    if (!book) throw new Error('目标书籍不存在');
+    const existing = chaptersOf(book.id).slice();
+    p.chapters.forEach((ch, i) => {
+      const found = existing.find(c => c.name.trim().toLowerCase() === ch.name.trim().toLowerCase());
+      if (found) { chIdMap.set(ch.srcId, found.id); return; }
+      const id = uid('ch');
+      chIdMap.set(ch.srcId, id);
+      const rec = { id: id, bookId: book.id, name: ch.name, createdAt: ch.createdAt || now + i };
+      newChapters.push(rec);
+      existing.push(rec);
+    });
+  }
+  /* duplicate protection (merge mode): signature of everything already in this book */
+  const seenSig = new Set();
+  const chNameById = {};
+  chaptersOf(book.id).forEach(c => { chNameById[c.id] = c.name.trim().toLowerCase(); });
+  if (mode === 'merge') {
+    S.questions.forEach(q => { if (chNameById[q.chapterId]) seenSig.add(questionSig(chNameById[q.chapterId], q)); });
+  }
+  const chNameBySrc = {};
+  p.chapters.forEach(c => { chNameBySrc[c.srcId] = c.name.trim().toLowerCase(); });
+  const qChapterOf = {};               // new question id -> chapter id
+  let skipped = 0;
+  p.questions.forEach((rec, i) => {
+    const chId = chIdMap.get(rec.chSrcId);
+    if (!chId) { skipped++; return; }
+    const chKey = chNameBySrc[rec.chSrcId] || '';
+    if (mode === 'merge') {
+      const sig = questionSig(chKey, rec.q);
+      if (seenSig.has(sig)) { skipped++; return; }
+      seenSig.add(sig);
+    }
+    const id = uid('q');
+    if (rec.srcId) qIdMap.set(rec.srcId, id);
+    qChapterOf[id] = chId;
+    newQuestions.push(Object.assign({ id: id, bookId: book.id, chapterId: chId, createdAt: now + i }, rec.q));
+  });
+  Object.keys(p.answerLog).forEach(k => {
+    const nid = qIdMap.get(String(k));
+    if (!nid) return;
+    newLogs[nid] = cloneData(p.answerLog[k]);
+  });
+  Object.keys(p.wrongBook).forEach(k => {
+    const nid = qIdMap.get(String(k));
+    if (!nid) return;
+    const w = cloneData(p.wrongBook[k]);
+    w.id = uid('wb');
+    w.qId = nid;
+    w.bookId = book.id;
+    w.chapterId = qChapterOf[nid] || w.chapterId || null;
+    newWrongs.push(w);
+  });
+  /* ---- commit: ONE assignment, only after everything above succeeded ----
+     the whole next state is built first; nothing is touched if anything threw. */
+  const nextAnswerLog = Object.assign({}, S.answerLog);
+  Object.keys(newLogs).forEach(k => { nextAnswerLog[k] = newLogs[k]; });
+  S = Object.assign({}, S, {
+    books: mode === 'new' ? S.books.concat([book]) : S.books.slice(),
+    chapters: S.chapters.concat(newChapters),
+    questions: S.questions.concat(newQuestions),
+    answerLog: nextAnswerLog,
+    wrongBook: S.wrongBook.concat(newWrongs)
+  });
+  save();
+  render();
+  return {
+    book: book, isNew: mode === 'new', name: book.name,
+    chapters: newChapters.length, reusedChapters: mode === 'merge' ? (p.chapters.length - newChapters.length) : 0,
+    questions: newQuestions.length, skipped: skipped,
+    logs: Object.keys(newLogs).length, wrongs: newWrongs.length
+  };
+}
+/* ---------- UI: import sheet ---------- */
+let bookImportCtx = null;      // { bookId, parsed, filename, error }
+function suggestBookName(name) {
+  const base = String(name || '导入的书籍').trim() || '导入的书籍';
+  const taken = n => S.books.some(b => b.name.trim().toLowerCase() === n.trim().toLowerCase());
+  if (!taken(base)) return base;
+  for (let i = 1; i < 100; i++) {
+    const cand = base + '（导入' + (i === 1 ? '' : ' ' + i) + '）';
+    if (!taken(cand)) return cand;
+  }
+  return base + '（导入 ' + Date.now().toString(36) + '）';
+}
+function openBookImportSheet(bookId) {
+  const b = bookId ? getBook(bookId) : null;
+  bookImportCtx = { bookId: b ? b.id : null, parsed: null, filename: '', error: null };
+  openGenericSheet(b ? ('Export / Import — ' + b.name) : 'Import Book', `
+    <div id="polBookImportBody"></div>
+    <input type="file" id="polBookFile" accept=".json,application/json,text/plain" style="display:none;" onchange="handleBookFile(event)">
+  `, [
+    { text: 'Close', onclick: () => { bookImportCtx = null; closeSheet('genericSheet'); } },
+    { text: 'Import', cls: 'primary', onclick: confirmBookImport }
+  ]);
+  renderBookImportBody();
+}
+function renderBookImportBody() {
+  const wrap = document.getElementById('polBookImportBody');
+  if (!wrap || !bookImportCtx) return;
+  const ctx = bookImportCtx;
+  const target = ctx.bookId ? getBook(ctx.bookId) : null;
+  const pickBtn = `<button class="apple-btn primary" onclick="document.getElementById('polBookFile').click()">选择 JSON 文件…</button>`;
+  const boxCss = 'padding:12px 14px;background:var(--bg-elev);border:1px solid var(--line);border-radius:var(--radius);font-size:12px;color:var(--ink-secondary);line-height:1.7;';
+  let h = '';
+  if (target) {
+    h += `<div style="${boxCss}">目标书籍：<b>《${esc(target.name)}》</b>（${chaptersOf(target.id).length} 个章节 · ${questionsOfBook(target.id).length} 道题）。导入只影响这本书，其他书籍及其答题记录、复习进度不会被改动。</div>`;
+  } else {
+    h += `<div style="${boxCss}">这里导入<b>一本新书</b>：选择其他设备导出的书籍 JSON，会把这本书（章节、题目、错题与复习进度）作为新书加入 Books 列表。已有书籍不会被覆盖。</div>`;
+  }
+  if (!ctx.parsed) {
+    h += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">${pickBtn}${target ? `<button class="apple-btn" onclick="exportBookJSON('${target.id}')">导出这本书</button>` : ''}</div>`;
+    h += `<div id="polBookImportStatus" class="ai-studio-status" style="margin-top:12px;">${ctx.error ? '❌ ' + esc(ctx.error) : '尚未选择文件。选择本功能导出的书籍 JSON（politics_书名_日期.json）。'}</div>`;
+    wrap.innerHTML = h;
+    return;
+  }
+  const p = ctx.parsed;
+  const typeCounts = Object.keys(TYPE_LABEL).filter(t => p.questions.some(r => r.q.type === t))
+    .map(t => TYPE_LABEL[t] + ' ' + p.questions.filter(r => r.q.type === t).length);
+  const nameDiff = !!target && target.name.trim() !== p.bookName.trim();
+  h += `<div id="polBookImportStatus" class="ai-studio-status" style="margin-top:12px;line-height:1.8;">✅ 文件校验通过：<b>${esc(p.bookName)}</b><br>${p.chapters.length} 个章节 · ${p.questions.length} 道题（${esc(typeCounts.join(' · ')) || '—'}）· 答题记录 ${Object.keys(p.answerLog).length} 条 · 错题 ${Object.keys(p.wrongBook).length} 条${p.warnings.length ? '<br>⚠️ ' + p.warnings.length + ' 处警告（已跳过无效项）' : ''}</div>`;
+  h += `<div style="margin-top:14px;display:flex;flex-direction:column;gap:8px;font-size:12px;line-height:1.7;">`;
+  if (target) {
+    h += `<label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="radio" name="polBookImportTarget" value="merge" checked onchange="onBookImportTargetChange()"><span>导入到现有书籍《${esc(target.name)}》<br><span class="bar-sub">相同章节名会合并，题干完全相同的题目自动跳过</span></span></label>`;
+    h += `<label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="radio" name="polBookImportTarget" value="new" onchange="onBookImportTargetChange()"><span>作为一本新书导入<br><span class="bar-sub">《${esc(target.name)}》保持不变</span></span></label>`;
+  } else {
+    h += `<label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="radio" name="polBookImportTarget" value="new" checked onchange="onBookImportTargetChange()"><span>作为一本新书加入 Books 列表</span></label>`;
+  }
+  h += `</div>`;
+  if (nameDiff) {
+    h += `<div style="margin-top:12px;${boxCss}border-color:var(--ink);color:var(--ink);">⚠️ 文件里的书名是《${esc(p.bookName)}》，与目标书籍《${esc(target.name)}》不同。请确认这是同一本书 —— 导入会把文件里的章节和题目合并进《${esc(target.name)}》，确认前不会写入任何数据。</div>`;
+  }
+  h += `<div id="polBookNewNameBox" style="margin-top:12px;display:none;">
+      <div class="bar-sub" style="margin-bottom:6px;">新书名称：</div>
+      <input type="text" id="polBookNewName" value="${esc(suggestBookName(p.bookName))}" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--ink);font-size:13px;">
+      <div class="bar-sub" style="margin-top:6px;">若列表里已存在同名书籍，会自动加「（导入）」后缀，绝不覆盖已有书籍。</div>
+    </div>`;
+  h += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">${pickBtn}</div>`;
+  wrap.innerHTML = h;
+  onBookImportTargetChange();
+}
+function onBookImportTargetChange() {
+  const el = document.querySelector('input[name="polBookImportTarget"]:checked');
+  const box = document.getElementById('polBookNewNameBox');
+  if (box) box.style.display = (el && el.value === 'new') ? 'block' : 'none';
+}
+function handleBookFile(ev) {
+  const f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    ev.target.value = '';
+    if (!bookImportCtx) return;
+    let data;
+    try { data = JSON.parse(String(r.result || '').replace(/^\uFEFF/, '')); }
+    catch (e) {
+      bookImportCtx.parsed = null; bookImportCtx.filename = f.name || '';
+      bookImportCtx.error = '文件不是有效的 JSON：' + (e && e.message ? e.message : e) + '。当前数据未被修改。';
+      renderBookImportBody(); toast('文件无法解析，未导入任何内容', 3200); return;
+    }
+    const p = normalizeBookPayload(data);
+    bookImportCtx.filename = f.name || '';
+    if (!p.ok) {
+      bookImportCtx.parsed = null;
+      bookImportCtx.error = p.error + '（当前数据未被修改）';
+      renderBookImportBody(); toast('文件校验未通过，未导入任何内容', 3400); return;
+    }
+    bookImportCtx.parsed = p;
+    bookImportCtx.error = null;
+    renderBookImportBody();
+  };
+  r.onerror = () => {
+    if (bookImportCtx) { bookImportCtx.parsed = null; bookImportCtx.error = '文件读取失败，当前数据未被修改。'; renderBookImportBody(); }
+    toast('文件读取失败');
+  };
+  r.readAsText(f, 'utf-8');
+}
+function confirmBookImport() {
+  const ctx = bookImportCtx;
+  if (!ctx) return;
+  if (!ctx.parsed) { toast('请先选择 JSON 文件', 2600); return; }
+  const p = ctx.parsed;
+  const el = document.querySelector('input[name="polBookImportTarget"]:checked');
+  const mode = el ? el.value : 'new';
+  const target = ctx.bookId ? getBook(ctx.bookId) : null;
+  let summary = null;
+  try {
+    if (mode === 'merge') {
+      if (!target) { toast('目标书籍不存在'); return; }
+      if (target.name.trim() !== p.bookName.trim()) {
+        if (!confirm('文件里的书名是「' + p.bookName + '」，当前书籍是「' + target.name + '」。\n\n确定要把文件中的 ' + p.chapters.length + ' 个章节、' + p.questions.length + ' 道题导入到「' + target.name + '」吗？\n其他书籍不会受到影响。')) return;
+      } else {
+        if (!confirm('把「' + p.bookName + '」的备份导入到当前这本书？\n\n将合并 ' + p.chapters.length + ' 个章节、' + p.questions.length + ' 道题（题干完全相同的题目自动跳过），并恢复相关错题与复习进度。\n其他书籍不受影响。')) return;
+      }
+      summary = applyBookImport(target, p, 'merge', '');
+    } else {
+      const inp = document.getElementById('polBookNewName');
+      let name = String((inp && inp.value) || p.bookName).trim();
+      if (!name) { toast('书名不能为空', 2600); return; }
+      if (S.books.some(b => b.name.trim().toLowerCase() === name.toLowerCase())) {
+        const fixed = suggestBookName(name);
+        if (inp) inp.value = fixed;
+        toast('已存在同名书籍，已改为「' + fixed + '」，请再点一次 Import', 4000);
+        return;
+      }
+      if (!confirm('把「' + p.bookName + '」作为新书加入？\n\n新书名称：「' + name + '」\n将添加 ' + p.chapters.length + ' 个章节、' + p.questions.length + ' 道题，以及相关错题与复习进度。\n已有书籍不会被修改。')) return;
+      summary = applyBookImport(null, p, 'new', name);
+    }
+  } catch (e) {
+    toast('导入失败：' + e.message + '（数据未改动）', 4200);
+    return;
+  }
+  bookImportCtx = null;
+  const wrap = document.getElementById('polBookImportBody');
+  if (wrap) {
+    wrap.innerHTML = `<div style="padding:14px;background:var(--bg-elev);border:1px solid var(--line);border-radius:var(--radius);font-size:12px;line-height:1.9;color:var(--ink);">
+      ✅ 已${summary.isNew ? '作为新书导入' : '导入到现有书籍'}：<b>《${esc(summary.name)}》</b><br>
+      新增章节 <b>${summary.chapters}</b>${summary.reusedChapters ? '（复用同名章节 ' + summary.reusedChapters + ' 个）' : ''} · 新增题目 <b>${summary.questions}</b>${summary.skipped ? ' · 跳过重复 ' + summary.skipped + ' 题' : ''}<br>
+      答题记录 <b>${summary.logs}</b> 条 · 错题/复习进度 <b>${summary.wrongs}</b> 条
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+        <button class="apple-btn small primary" onclick="closeSheet('genericSheet');go('book',{bookId:'${summary.book.id}'})">打开这本书</button>
+        <button class="apple-btn small" onclick="closeSheet('genericSheet');go('home')">返回 Books</button>
+      </div>
+    </div>`;
+  }
+  toast('已导入《' + summary.name + '》：' + summary.questions + ' 题', 3200);
+}
+
+/* ================================================================
+   BACKUP (whole politics library → one .json file)
+   Export: { app, kind:'politics-backup', version, schemaVersion, exportedAt,
+             counts, books, chapters, questions, answerLog, wrongBook,
+             createdAt, updatedAt }
+   Import: strict validation of the same shape (also accepts the older
+           { app, exportedAt, ...S } files and a raw state object); the current
+           data is replaced ONLY after the whole file passed validation AND the
+           user confirmed. A failed import never touches existing data.
+   Namespace: polquiz_v1* only — never writes into the English Quiz Hub keys.
+   ================================================================ */
+function buildFullBackupPayload() {
+  return {
+    app: 'politics-quiz-hub',
+    kind: 'politics-backup',
+    version: '1.0',
+    schemaVersion: SCHEMA,
+    exportedAt: new Date().toISOString(),
+    counts: {
+      books: S.books.length, chapters: S.chapters.length, questions: S.questions.length,
+      answerLog: Object.keys(S.answerLog || {}).length, wrongBook: S.wrongBook.length, due: dueItems().length
+    },
+    books: cloneData(S.books),
+    chapters: cloneData(S.chapters),
+    questions: cloneData(S.questions),
+    answerLog: cloneData(S.answerLog),
+    wrongBook: cloneData(S.wrongBook),
+    createdAt: S.createdAt || null,
+    updatedAt: S.updatedAt || null
+  };
+}
+function exportAll() {
+  const payload = buildFullBackupPayload();
+  const filename = 'politics_quiz_backup_' + todayISO() + '.json';
+  saveJSONFile(payload, filename, { statusId: 'polBackupStatus' });
+}
+function openBackup() {
+  const wrongN = S.wrongBook.length, dueN = dueItems().length;
+  const boxCss = 'padding:12px 14px;background:var(--bg-elev);border:1px solid var(--line);border-radius:var(--radius);font-size:12px;color:var(--ink-secondary);line-height:1.7;';
+  openGenericSheet('Backup', `
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div style="${boxCss}">
+        当前数据：<b>${S.books.length}</b> 本书 · <b>${S.chapters.length}</b> 个章节 · <b>${S.questions.length}</b> 道题 · 错题 <b>${wrongN}</b>（待复习 <b>${dueN}</b>）。<br>
+        数据保存在这台设备的浏览器里（本页独立命名空间 polquiz_v1，不会影响英语 Quiz Hub）。清除浏览器数据会丢失，建议定期导出备份。
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="apple-btn primary" onclick="exportAll()">Export All Data</button>
+        <button class="apple-btn" onclick="document.getElementById('polBackupFile').click()">Import Backup</button>
+        <button class="apple-btn small" onclick="openSaveFallbackSheet()">保存遇到问题？</button>
+        <input type="file" id="polBackupFile" accept=".json,application/json,text/plain" style="display:none;" onchange="handleBackupFile(event)">
+      </div>
+      <div id="polBackupStatus" class="ai-studio-status" style="line-height:1.7;">导出的 .json 包含全部书籍、章节、题目、答题历史、错题记录与复习进度。Import Backup 会用备份文件<b>替换</b>当前政治题库的全部数据（导入前会让你确认）。</div>
+    </div>`, [{ text: 'Close', cls: 'primary', onclick: () => closeSheet('genericSheet') }]);
+  collapseSidebarOnMobile();
+}
+function questionShapeError(q) {
+  if (!q || typeof q !== 'object' || Array.isArray(q)) return '不是对象';
+  if (!TYPE_LABEL[q.type]) return 'type 无法识别：' + (q.type == null ? '空' : q.type);
+  if (isObjective(q.type)) {
+    if (!Array.isArray(q.options) || q.options.length < 2) return '缺少 options';
+    const ans = Array.isArray(q.answer) ? q.answer.join('') : String(q.answer == null ? '' : q.answer);
+    if (!ans) return '缺少 answer';
+    if (!/^[A-H]+$/i.test(ans)) return 'answer 不是选项字母：' + ans;
+  } else if (q.type === 'material') {
+    if (!Array.isArray(q.subQuestions) || !q.subQuestions.length) return '材料分析题缺少 subQuestions';
+  } else {
+    if (String(q.answer == null ? '' : q.answer).trim() === '') return '缺少 answer';
+  }
+  return '';
+}
+/* → { ok, error, state, notes[] }  — pure: never touches S */
+function normalizeFullBackup(text) {
+  const out = { ok: false, error: null, state: null, notes: [] };
+  const clean = String(text || '').replace(/^\uFEFF/, '').trim();
+  if (!clean) { out.error = '文件是空的'; return out; }
+  let data;
+  try { data = JSON.parse(clean); } catch (e) { out.error = '文件不是有效的 JSON：' + (e && e.message ? e.message : e); return out; }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) { out.error = '备份文件的顶层必须是一个对象'; return out; }
+  if (data.passages || data.grammarQuestions || data.quizSets || data.roadmap) { out.error = '这是英语 Quiz Hub 的数据，不能导入到政治版'; return out; }
+  const src = (data.state && typeof data.state === 'object' && !Array.isArray(data.state)) ? data.state : data;
+  if (!Array.isArray(src.books)) { out.error = '备份文件格式不对：缺少 books 数组（这可能不是 Political Quiz Hub 的备份）'; return out; }
+  if (!Array.isArray(src.chapters)) { out.error = '备份文件格式不对：缺少 chapters 数组'; return out; }
+  if (!Array.isArray(src.questions)) { out.error = '备份文件格式不对：缺少 questions 数组'; return out; }
+
+  const books = [], bookIds = new Set();
+  for (let i = 0; i < src.books.length; i++) {
+    const b = src.books[i];
+    if (!b || typeof b !== 'object' || Array.isArray(b)) { out.error = '第 ' + (i + 1) + ' 本书不是对象'; return out; }
+    const id = b.id == null ? '' : String(b.id);
+    if (!id) { out.error = '第 ' + (i + 1) + ' 本书缺少 id'; return out; }
+    if (bookIds.has(id)) { out.error = '书籍 id 重复：' + id; return out; }
+    bookIds.add(id);
+    books.push(Object.assign({}, b, { id: id, name: String(b.name == null ? '' : b.name) }));
+  }
+  if (!books.length && !src.questions.length) { out.error = '备份里没有任何书籍或题目'; return out; }
+
+  const chapters = [], chIds = new Set(), chBook = {};
+  for (let i = 0; i < src.chapters.length; i++) {
+    const c = src.chapters[i];
+    if (!c || typeof c !== 'object' || Array.isArray(c)) { out.error = '第 ' + (i + 1) + ' 个章节不是对象'; return out; }
+    const id = c.id == null ? '' : String(c.id);
+    if (!id) { out.error = '第 ' + (i + 1) + ' 个章节缺少 id'; return out; }
+    if (chIds.has(id)) { out.error = '章节 id 重复：' + id; return out; }
+    const bid = c.bookId == null ? '' : String(c.bookId);
+    if (!bookIds.has(bid)) { out.error = '章节「' + String(c.name || id) + '」指向的书籍不存在（bookId=' + bid + '）'; return out; }
+    chIds.add(id); chBook[id] = bid;
+    chapters.push(Object.assign({}, c, { id: id, bookId: bid, name: String(c.name == null ? '' : c.name) }));
+  }
+
+  const questions = [], qIds = new Set(), qChapter = {}, qBook = {};
+  let fixedBookRefs = 0;
+  for (let i = 0; i < src.questions.length; i++) {
+    const q = src.questions[i];
+    const shapeErr = questionShapeError(q);
+    if (shapeErr) { out.error = '第 ' + (i + 1) + ' 道题数据不完整：' + shapeErr; return out; }
+    const id = q.id == null ? '' : String(q.id);
+    if (!id) { out.error = '第 ' + (i + 1) + ' 道题缺少 id'; return out; }
+    if (qIds.has(id)) { out.error = '题目 id 重复：' + id; return out; }
+    const cid = q.chapterId == null ? '' : String(q.chapterId);
+    if (!chIds.has(cid)) { out.error = '第 ' + (i + 1) + ' 道题指向的章节不存在（chapterId=' + cid + '）'; return out; }
+    const bid = q.bookId == null ? '' : String(q.bookId);
+    const realBid = chBook[cid];
+    if (bid !== realBid) fixedBookRefs++;
+    qIds.add(id); qChapter[id] = cid; qBook[id] = realBid;
+    questions.push(Object.assign({}, q, { id: id, chapterId: cid, bookId: realBid }));
+  }
+
+  const answerLog = {};
+  let droppedLogs = 0;
+  if (src.answerLog && typeof src.answerLog === 'object' && !Array.isArray(src.answerLog)) {
+    Object.keys(src.answerLog).forEach(k => {
+      const v = src.answerLog[k];
+      if (!qIds.has(String(k)) || !v || typeof v !== 'object' || Array.isArray(v)) { droppedLogs++; return; }
+      answerLog[String(k)] = v;
+    });
+  }
+  const wrongBook = [], seenQ = new Set();
+  let droppedWrongs = 0;
+  if (Array.isArray(src.wrongBook)) {
+    src.wrongBook.forEach(w => {
+      if (!w || typeof w !== 'object' || Array.isArray(w)) { droppedWrongs++; return; }
+      const qid = w.qId == null ? '' : String(w.qId);
+      if (!qIds.has(qid) || seenQ.has(qid)) { droppedWrongs++; return; }
+      seenQ.add(qid);
+      const rec = Object.assign({}, w);
+      rec.qId = qid;
+      rec.bookId = qBook[qid];
+      rec.chapterId = qChapter[qid];
+      if (!rec.id) rec.id = uid('wb');
+      wrongBook.push(rec);
+    });
+  }
+  if (fixedBookRefs) out.notes.push('修正了 ' + fixedBookRefs + ' 道题的 bookId（按所属章节归属）');
+  if (droppedLogs) out.notes.push('忽略了 ' + droppedLogs + ' 条找不到对应题目的答题记录');
+  if (droppedWrongs) out.notes.push('忽略了 ' + droppedWrongs + ' 条无效的错题记录');
+  if (!books.length) out.notes.push('备份里没有书籍，导入后题库会是空的');
+
+  out.state = {
+    schemaVersion: SCHEMA,
+    books: books, chapters: chapters, questions: questions,
+    answerLog: answerLog, wrongBook: wrongBook,
+    createdAt: src.createdAt || Date.now(),
+    updatedAt: src.updatedAt || Date.now()
+  };
+  out.ok = true;
+  return out;
+}
+function handleBackupFile(ev) {
+  const f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  const say = html => setStatusHTML('polBackupStatus', html);
+  const r = new FileReader();
+  r.onload = () => {
+    ev.target.value = '';
+    const res = normalizeFullBackup(String(r.result || ''));
+    if (!res.ok) {
+      say('❌ 第 1 步校验未通过：' + esc(res.error) + '<br>当前数据未被修改。');
+      toast('备份文件不可用，未改动任何数据', 3600);
+      return;
+    }
+    const st = res.state;
+    const due = st.wrongBook.filter(w => !w.mastered && !w.completed && (!w.nextReviewDate || w.nextReviewDate <= todayISO())).length;
+    const msg = '用这个备份替换当前政治题库的全部数据？\n\n'
+      + '备份内容：' + st.books.length + ' 本书 · ' + st.chapters.length + ' 个章节 · ' + st.questions.length + ' 道题\n'
+      + '答题记录 ' + Object.keys(st.answerLog).length + ' 条 · 错题 ' + st.wrongBook.length + ' 条（待复习 ' + due + '）\n\n'
+      + '当前数据（' + S.books.length + ' 本书 · ' + S.chapters.length + ' 个章节 · ' + S.questions.length + ' 道题）将被完全替换，包括所有书籍的答题记录与复习进度。\n\n'
+      + (res.notes.length ? '注意：\n· ' + res.notes.join('\n· ') + '\n\n' : '')
+      + '确定继续吗？';
+    if (!confirm(msg)) { say('已取消导入，当前数据未被修改。'); toast('已取消备份导入', 2600); return; }
+    /* ---- commit: replace the whole state in one shot ---- */
+    S = migrateState(st);
+    cleanOrphans();
+    save();
+    UI = { view: 'home', bookId: null, chapterId: null, reviewBookId: 'all' };
+    saveUI(); rv = null; cardState = {}; importTarget = null;
+    render();
+    say('✅ 已恢复备份：<b>' + S.books.length + '</b> 本书 · <b>' + S.chapters.length + '</b> 个章节 · <b>' + S.questions.length + '</b> 道题 · 答题记录 <b>' + Object.keys(S.answerLog).length + '</b> 条 · 错题 <b>' + S.wrongBook.length + '</b> 条。'
+      + (res.notes.length ? '<br>' + esc(res.notes.join('；')) : ''));
+    toast('已恢复备份：' + S.books.length + ' 本书 · ' + S.questions.length + ' 道题', 3200);
+  };
+  r.onerror = () => { say('❌ 文件读取失败，当前数据未被修改。'); toast('文件读取失败'); };
+  r.readAsText(f, 'utf-8');
+}
+
+/* ================================================================
+   SIDEBAR (same behaviour as the original) + INIT
+   ================================================================ */
+let sidebarCollapsed = true, lastIsMobile = false;
+function isMobileViewport() { return window.innerWidth <= 768; }
+function applySidebar() {
+  const app = document.getElementById('app');
+  app.classList.toggle('sidebar-collapsed', sidebarCollapsed);
+}
+function toggleSidebar() {
+  sidebarCollapsed = !sidebarCollapsed;
+  try { localStorage.setItem(SIDEBAR_KEY, JSON.stringify(sidebarCollapsed)); } catch (e) {}
+  applySidebar();
+}
+function collapseSidebarOnMobile() { if (isMobileViewport() && !sidebarCollapsed) { sidebarCollapsed = true; applySidebar(); } }
+function onResize() {
+  const m = isMobileViewport();
+  if (m === lastIsMobile) return;
+  lastIsMobile = m;
+  if (m) sidebarCollapsed = true;
+  else { let p = null; try { p = JSON.parse(localStorage.getItem(SIDEBAR_KEY)); } catch (e) {} sidebarCollapsed = p === null ? false : !!p; }
+  applySidebar();
+}
+let lastRenderDate = todayISO();
+function init() {
+  loadState();
+  lastIsMobile = isMobileViewport();
+  if (lastIsMobile) sidebarCollapsed = true;
+  else { let p = null; try { p = JSON.parse(localStorage.getItem(SIDEBAR_KEY)); } catch (e) {} sidebarCollapsed = p === null ? false : !!p; }
+  applySidebar();
+  const app = document.getElementById('app');
+  app.addEventListener('click', e => { if (e.target === app && isMobileViewport() && !sidebarCollapsed) { sidebarCollapsed = true; applySidebar(); } });
+  window.addEventListener('resize', onResize);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && todayISO() !== lastRenderDate) { lastRenderDate = todayISO(); render(); }
+  });
+  render();
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+}
+init();
+
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a507be288d2dd77b',t:'MTc5Mjk5OTY5MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
