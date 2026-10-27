@@ -999,6 +999,7 @@ html[data-theme="dark"] .q-actions button.on { color:#1C1C1E; }
 .pol-plan-row { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; background:var(--bg-card); border:1px solid var(--line-light); border-radius:var(--radius-sm); }
 .pol-plan-main { flex:1 1 auto; min-width:0; }
 .pol-plan-name { font-size:13px; font-weight:700; line-height:1.5; overflow-wrap:anywhere; word-break:break-word; }
+.pol-plan-input { width:100%; box-sizing:border-box; padding:7px 9px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--bg-card); color:var(--ink); font-size:16px; font-family:inherit; }
 .pol-plan-sub { font-size:11px; color:var(--ink-secondary); line-height:1.6; margin-top:2px; overflow-wrap:anywhere; }
 .pol-badge { flex:0 0 auto; font-size:10px; font-weight:700; padding:3px 8px; border-radius:var(--radius-pill); border:1px solid var(--line); color:var(--ink-secondary); white-space:nowrap; }
 .pol-badge.new { border-color:var(--ink); color:var(--ink); }
@@ -3159,149 +3160,200 @@ function stripListNumber(s) {
     .replace(/^[（(]?\s*[0-9]{1,3}\s*[）)]?\s*(?:[\.、,，:：]\s*|\s+)/, '')
     .trim();
 }
-function parseSyllabus(text) {
-  const lines = String(text || '').split(/\r?\n/);
-  const CN = '一二三四五六七八九十百零〇两';
-  const reZhang = new RegExp('^第\\s*([0-9]+|[' + CN + ']+)\\s*([章节篇讲单元部分专题])\\s*[、,，\\.．:：\\-—]?\\s*(.*)$');
-  const reNum = /^[（(]?\s*([0-9]{1,3})\s*[）)]?\s*[\.、,，:：）)]?\s*(.+)$/;
-  const cleaned = [];
-  lines.forEach((ln, i) => {
-    const t = cleanChapterLine(ln);
-    if (!t) return;                                  // blank line → ignored silently
-    if (/^(目录|目\s*录|contents|contents:)$/i.test(t)) return;
-    cleaned.push({ line: i + 1, text: t, stripped: stripListNumber(t) });
-  });
-  const hasZhang = cleaned.some(x => reZhang.test(x.text) || (x.stripped && reZhang.test(x.stripped)));
-  const hasNum = cleaned.some(x => reNum.test(x.text));
-  const items = [], ignored = [];
-  cleaned.forEach(x => {
-    let ok = false, no = null, name = x.text;
-    /* 第一章 xxx  (also behind a "1." / "01 " list number) */
-    if (reZhang.test(x.stripped)) { ok = true; name = x.stripped; no = chapterNoOf(x.stripped); }
-    else if (reZhang.test(x.text)) { ok = true; name = x.text; no = chapterNoOf(x.text); }
-    /* 1. xxx / 1、xxx / 01 xxx  (only when the text has no 第X章 style at all) */
-    if (!ok && !hasZhang && hasNum) {
-      const m2 = x.text.match(reNum);
-      if (m2) { ok = true; no = parseInt(m2[1], 10); name = (x.stripped || x.text).trim() || x.text; }
-    }
-    if (!ok && !hasZhang && !hasNum) ok = true;        // plain list of names
-    if (!ok) { ignored.push(x); return; }
-    items.push({ raw: x.text, name: name, no: no, line: x.line });
-  });
-  /* duplicates inside the pasted text (by normalised name) */
-  const seen = {}, dupes = [];
-  const unique = [];
-  items.forEach(it => {
-    const key = normChapterName(it.name);
-    if (!key) { ignored.push({ line: it.line, text: it.raw }); return; }
-    if (seen[key]) { dupes.push(it); seen[key].dupCount = (seen[key].dupCount || 0) + 1; return; }
-    seen[key] = it; it.key = key; unique.push(it);
-  });
-  return { items: unique, ignored: ignored, dupes: dupes, mode: hasZhang ? '章' : (hasNum ? '序号' : '纯文本') };
+/* Exact-ish key used ONLY for batch-chapter duplicate detection: collapses whitespace and
+   lower-cases, but keeps 「第一章」「第二章」 etc. so different numbered chapters never collide. */
+function chapterKey(s) {
+  return String(s == null ? '' : s).replace(/[\s\u00A0\u3000]+/g, ' ').trim().toLowerCase();
 }
-let batchChapterCtx = null;    // { bookId, courseId, parsed, moveSame }
+/* Every non-empty line is a chapter. Nothing is filtered, renamed or deduplicated here;
+   the chapter number (第一章 / 1. …) is only *recognised* for display, never required. */
+function parseSyllabus(text, opts) {
+  opts = opts || {};
+  const items = [];
+  String(text == null ? '' : text).split(/\r?\n/).forEach((ln, i) => {
+    let t = ln.replace(/^[\s\u00A0\u3000\uFEFF]+|[\s\u00A0\u3000\uFEFF]+$/g, '');
+    if (!t) return;                                   // blank line → skipped
+    if (opts.cleanToc) { const c = cleanChapterLine(t); if (c) t = c; }   // optional, off by default
+    items.push({ line: i + 1, name: t, no: chapterNoOf(t) });
+  });
+  return { items: items, ignored: [], dupes: [], mode: '逐行' };
+}
+let batchChapterCtx = null;    // { bookId, courseId, rows:[{rid,name,no,on,manual}]|null, moveSame, dirty }
+let batchRowSeq = 0;
 function openBatchChapterSheet(bookId, courseId) {
   const b = getBook(bookId); if (!b) { toast('书籍不存在'); return; }
   const co = courseId && courseId !== UNCAT ? getCourse(courseId) : null;
   if (!co) { toast('请先进入一个课程，再批量创建章节'); return; }
-  batchChapterCtx = { bookId: b.id, courseId: co.id, parsed: null, moveSame: false };
-  openGenericSheet('批量创建章节 — ' + courseTitle(co), `
-    <div id="polBatchChapterBody"></div>
-  `, [
+  batchChapterCtx = { bookId: b.id, courseId: co.id, rows: null, moveSame: false, dirty: false };
+  openGenericSheet('批量创建章节 — ' + courseTitle(co), `<div id="polBatchChapterBody"></div>`, [
     { text: 'Close', onclick: () => { batchChapterCtx = null; closeSheet('genericSheet'); } },
     { text: '解析预览', onclick: parseBatchChapters },
-    { text: '创建章节', cls: 'primary', onclick: confirmBatchChapters }
+    { text: '确认创建', cls: 'primary', onclick: confirmBatchChapters }
   ]);
   renderBatchChapterBody();
 }
+/* Skeleton is rendered once so the textarea keeps what the user pasted. */
 function renderBatchChapterBody() {
   const wrap = document.getElementById('polBatchChapterBody');
   if (!wrap || !batchChapterCtx) return;
   const ctx = batchChapterCtx, b = getBook(ctx.bookId), co = getCourse(ctx.courseId);
-  let h = `<div style="display:flex;flex-direction:column;gap:14px;">
+  wrap.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px;">
     <div style="padding:12px 14px;background:var(--bg-elev);border:1px solid var(--line);border-radius:var(--radius);font-size:12px;color:var(--ink-secondary);line-height:1.7;">
       目标：<b>《${esc(b.name)}》 › ${esc(courseTitle(co))}</b>（现有 ${chaptersOfCourse(b.id, co.id).length} 个章节）。<br>
-      直接粘贴教材目录，每行一个章节。支持 <b>第一章 xxx</b> / <b>第1章 xxx</b> / <b>1. xxx</b> / <b>1、xxx</b> / <b>01 xxx</b>；空行和页码会被忽略。此操作只创建章节，不会生成题目，也不会删除现有章节。
+      每个非空行就是一个章节，名称完全由你决定：「导论」「专题一：xxx」「期末复习」都可以，不要求有「第X章」或编号。空行会跳过。解析后可在预览里改名、增删、调整顺序，点「确认创建」才会真正创建。此操作只新增章节，不会生成题目，也不会删除或覆盖现有章节。
     </div>
-    <textarea id="polSyllabusArea" class="ai-studio-import-textarea" style="min-height:200px;max-height:44vh;overflow:auto;" placeholder="第一章 毛泽东思想及其历史地位
+    <textarea id="polSyllabusArea" class="ai-studio-import-textarea" style="min-height:160px;max-height:36vh;overflow:auto;" placeholder="导论
+第一章 毛泽东思想及其历史地位
 第二章 新民主主义革命理论
-第三章 社会主义改造理论
-第四章 社会主义建设道路初步探索的理论成果"></textarea>`;
-  const p = ctx.parsed;
-  if (p) {
-    const existing = chaptersOfCourse(b.id, co.id);
-    const plan = p.items.map(it => {
-      const same = existing.find(c => normChapterName(c.name) === it.key);
-      const other = same ? null : S.chapters.find(c => c.bookId === b.id && c.courseId !== co.id && normChapterName(c.name) === it.key);
-      return { it: it, same: same || null, other: other || null };
-    });
-    const nNew = plan.filter(x => !x.same).length;
-    const nSkip = plan.filter(x => x.same).length;
-    ctx.plan = plan;
-    h += `<div id="polBatchChapterStatus" class="ai-studio-status" style="line-height:1.8;">解析完成（按「${p.mode}」格式识别）：<b>${p.items.length}</b> 个章节 · 预计新增 <b>${nNew}</b> 个 · 已存在跳过 <b>${nSkip}</b> 个${p.ignored.length ? ' · 忽略 ' + p.ignored.length + ' 行' : ''}${p.dupes.length ? ' · 文内重复 ' + p.dupes.length + ' 行' : ''}</div>`;
-    h += `<div class="pol-plan-list">${plan.map((x, i) => `
-      <div class="pol-plan-row">
-        <div class="pol-plan-main">
-          <div class="pol-plan-name">${i + 1}. ${esc(x.it.name)}</div>
-          <div class="pol-plan-sub">${x.it.no ? '识别序号 ' + x.it.no + ' · ' : ''}${x.same ? '已存在，将跳过（不覆盖）' : (x.other ? '同名章节在另一个课程里，本课程中会新建' : '将新建')}</div>
-        </div>
-        <span class="pol-badge ${x.same ? 'skip' : 'new'}">${x.same ? '已存在' : '新建'}</span>
-      </div>`).join('')}</div>`;
-    if (p.dupes.length) h += `<div class="pol-note warn">⚠️ 粘贴内容里有 ${p.dupes.length} 行重复章节，已自动去重：${esc(p.dupes.slice(0, 6).map(x => x.raw).join(' / '))}${p.dupes.length > 6 ? ' …' : ''}</div>`;
-    if (p.ignored.length) h += `<div class="pol-note">已忽略 ${p.ignored.length} 行无法识别的内容（例如小节标题、页码）：${esc(p.ignored.slice(0, 6).map(x => x.text).join(' / '))}${p.ignored.length > 6 ? ' …' : ''}</div>`;
-    const otherCount = plan.filter(x => x.other).length;
-    if (otherCount) h += `<label class="pol-check"><input type="checkbox" id="polMoveSame" ${ctx.moveSame ? 'checked' : ''} onchange="batchChapterCtx.moveSame=this.checked">
-      <span>把其它课程中同名的 ${otherCount} 个章节移动到本课程（默认关闭；开启后那些章节会离开原课程）</span></label>`;
-    h += `<div class="pol-note">确认后会新增 <b>${nNew}</b> 个章节到「${esc(courseTitle(co))}」，顺序与粘贴内容一致。</div>`;
-  } else {
-    h += `<div id="polBatchChapterStatus" class="ai-studio-status">粘贴目录后点「解析预览」，先预览再创建。</div>`;
+专题一：重点知识
+期末复习"></textarea>
+    <label class="pol-check"><input type="checkbox" id="polCleanToc"><span>（可选）去掉行首项目符号和行尾页码（如「……12」）。默认关闭，名称原样保留。</span></label>
+    <div id="polBatchPreview"></div>
+  </div>`;
+  renderBatchPreview();
+}
+function renderBatchPreview() {
+  const box = document.getElementById('polBatchPreview');
+  const ctx = batchChapterCtx;
+  if (!box || !ctx) return;
+  if (!ctx.rows) {
+    box.innerHTML = `<div id="polBatchChapterStatus" class="ai-studio-status">粘贴目录后点「解析预览」，先预览、可编辑，再创建。</div>`;
+    return;
   }
-  h += `</div>`;
-  wrap.innerHTML = h;
+  let h = `<div id="polBatchSummary" class="ai-studio-status" style="line-height:1.8;"></div>`;
+  h += `<div class="pol-plan-list">${ctx.rows.map((r, i) => `
+    <div class="pol-plan-row" id="brow_${r.rid}">
+      <input type="checkbox" id="bchk_${r.rid}" ${r.on ? 'checked' : ''} onchange="batchRowToggle('${r.rid}',this.checked)" title="勾选 = 创建这一行" style="margin-top:10px;flex:0 0 auto;">
+      <div class="pol-plan-main">
+        <input type="text" class="pol-plan-input" id="bin_${r.rid}" value="${esc(r.name)}" oninput="batchRowEdit('${r.rid}',this.value)" placeholder="章节名称（可自定义任意名称）">
+        <div class="pol-plan-sub" id="bsub_${r.rid}"></div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <button class="apple-btn small" ${i === 0 ? 'disabled style="opacity:.4"' : ''} onclick="batchRowMove('${r.rid}',-1)" title="上移">↑</button>
+          <button class="apple-btn small" ${i === ctx.rows.length - 1 ? 'disabled style="opacity:.4"' : ''} onclick="batchRowMove('${r.rid}',1)" title="下移">↓</button>
+          <button class="apple-btn small" onclick="batchRowDelete('${r.rid}')" title="从本次创建列表中删除这一行">删除此行</button>
+        </div>
+      </div>
+    </div>`).join('')}</div>`;
+  h += `<div><button class="apple-btn small" onclick="batchAddRow()">+ 添加一行</button></div>`;
+  h += `<div id="polMoveWrap"></div>`;
+  box.innerHTML = h;
+  refreshBatchStatus();
+}
+/* In-place status refresh (never rebuilds inputs, so typing keeps focus). */
+function refreshBatchStatus() {
+  const ctx = batchChapterCtx;
+  if (!ctx || !ctx.rows) return;
+  const b = getBook(ctx.bookId), co = getCourse(ctx.courseId);
+  if (!b || !co) return;
+  const exMap = new Map();
+  chaptersOfCourse(b.id, co.id).forEach(c => { const k = chapterKey(c.name); if (!exMap.has(k)) exMap.set(k, c); });
+  const cnt = new Map();
+  ctx.rows.forEach(r => { const k = chapterKey(r.name); if (k) cnt.set(k, (cnt.get(k) || 0) + 1); });
+  ctx.rows.forEach(r => {
+    const k = chapterKey(r.name);
+    r.key = k; r.empty = !k;
+    r.same = k ? (exMap.get(k) || null) : null;
+    r.other = (k && !r.same) ? (S.chapters.find(c => c.bookId === b.id && c.courseId !== co.id && chapterKey(c.name) === k) || null) : null;
+    r.dupN = k ? cnt.get(k) : 0;
+    if (!r.manual) r.on = !r.empty && !r.same;       // default: skip empty / already-existing; user can override
+    const chk = document.getElementById('bchk_' + r.rid);
+    if (chk) chk.checked = !!r.on;
+    const sub = document.getElementById('bsub_' + r.rid);
+    if (sub) {
+      const notes = [];
+      if (r.empty) notes.push('名称为空，不会创建');
+      if (r.no) notes.push('识别序号 ' + r.no);
+      if (r.same) notes.push('⚠️ 当前课程已存在同名章节：默认跳过（现有章节不会被改动或覆盖）；若勾选，会另建一个同名新章节');
+      else if (r.other) notes.push('同名章节在另一个课程里，本课程会新建');
+      if (r.dupN > 1) notes.push('⚠️ 本次内容中有 ' + r.dupN + ' 行同名，是否都创建由你决定（勾选 = 创建）');
+      if (!notes.length) notes.push(r.on ? '将新建' : '已取消勾选，不会创建');
+      else if (!r.on && !r.empty && !r.same) notes.push('已取消勾选，不会创建');
+      sub.textContent = notes.join(' · ');
+    }
+  });
+  const nCreate = ctx.rows.filter(r => r.on && !r.empty).length;
+  const nExist = ctx.rows.filter(r => r.same).length;
+  const nDupRows = ctx.rows.filter(r => r.dupN > 1).length;
+  const nOff = ctx.rows.filter(r => !r.on && !r.empty).length;
+  const sum = document.getElementById('polBatchSummary');
+  if (sum) sum.textContent = '共 ' + ctx.rows.length + ' 行 · 将创建 ' + nCreate + ' 个 · 不创建 ' + nOff + ' 个' + (nExist ? ' · 已存在 ' + nExist + ' 个' : '') + (nDupRows ? ' · 同名重复 ' + nDupRows + ' 行' : '');
+  const mv = document.getElementById('polMoveWrap');
+  if (mv) {
+    const otherCount = ctx.rows.filter(r => r.on && !r.empty && !r.same && r.other).length;
+    mv.innerHTML = otherCount ? `<label class="pol-check"><input type="checkbox" ${ctx.moveSame ? 'checked' : ''} onchange="batchChapterCtx.moveSame=this.checked">
+      <span>把其它课程中同名的 ${otherCount} 个章节移动到本课程（默认关闭；开启后那些章节会离开原课程）</span></label>` : '';
+  }
+}
+function batchRowById(rid) { return batchChapterCtx && batchChapterCtx.rows ? batchChapterCtx.rows.find(r => r.rid === rid) : null; }
+function batchRowEdit(rid, v) {
+  const r = batchRowById(rid); if (!r) return;
+  r.name = v; r.no = chapterNoOf(v); batchChapterCtx.dirty = true;
+  refreshBatchStatus();
+}
+function batchRowToggle(rid, on) {
+  const r = batchRowById(rid); if (!r) return;
+  r.on = !!on; r.manual = true; batchChapterCtx.dirty = true;
+  refreshBatchStatus();
+}
+function batchRowMove(rid, dir) {
+  const rows = batchChapterCtx && batchChapterCtx.rows; if (!rows) return;
+  const i = rows.findIndex(r => r.rid === rid), j = i + dir;
+  if (i < 0 || j < 0 || j >= rows.length) return;
+  const t = rows[i]; rows[i] = rows[j]; rows[j] = t;
+  batchChapterCtx.dirty = true; renderBatchPreview();
+}
+function batchRowDelete(rid) {
+  const rows = batchChapterCtx && batchChapterCtx.rows; if (!rows) return;
+  const i = rows.findIndex(r => r.rid === rid); if (i < 0) return;
+  rows.splice(i, 1); batchChapterCtx.dirty = true; renderBatchPreview();   // only removes this row from the to-create list
+}
+function batchAddRow() {
+  const ctx = batchChapterCtx; if (!ctx) return;
+  if (!ctx.rows) ctx.rows = [];
+  const rid = 'r' + (++batchRowSeq);
+  ctx.rows.push({ rid: rid, name: '', no: null, on: false, manual: false });
+  ctx.dirty = true; renderBatchPreview();
+  const inp = document.getElementById('bin_' + rid); if (inp) inp.focus();
 }
 function parseBatchChapters() {
-  if (!batchChapterCtx) return;
+  const ctx = batchChapterCtx; if (!ctx) return;
   const ta = document.getElementById('polSyllabusArea');
   const text = ta ? ta.value : '';
   if (!String(text).trim()) { toast('请先粘贴教材目录', 2600); return; }
-  const p = parseSyllabus(text);
-  if (!p.items.length) {
-    document.getElementById('polBatchChapterStatus').innerHTML = '❌ 没有识别到任何章节行，请检查粘贴内容。';
-    toast('没有识别到章节', 2600); return;
-  }
-  batchChapterCtx.parsed = p;
-  renderBatchChapterBody();
+  if (ctx.rows && ctx.dirty && !window.confirm('重新解析会覆盖预览里已做的修改，继续吗？')) return;
+  const cleanToc = !!(document.getElementById('polCleanToc') || {}).checked;
+  const p = parseSyllabus(text, { cleanToc: cleanToc });
+  if (!p.items.length) { toast('没有可创建的行', 2600); return; }
+  ctx.rows = p.items.map(it => ({ rid: 'r' + (++batchRowSeq), name: it.name, no: it.no, on: true, manual: false }));
+  ctx.dirty = false; ctx.moveSame = false;
+  renderBatchPreview();
 }
 function confirmBatchChapters() {
   const ctx = batchChapterCtx;
   if (!ctx) return;
-  if (!ctx.parsed || !ctx.plan) { toast('请先点「解析预览」', 2600); return; }
+  if (!ctx.rows || !ctx.rows.length) { toast('请先点「解析预览」', 2600); return; }
   const b = getBook(ctx.bookId), co = getCourse(ctx.courseId);
   if (!b || !co) { toast('目标课程不存在'); return; }
+  refreshBatchStatus();
   const now = Date.now();
-  const created = [], moved = [];
+  const created = [], moved = [], movedIds = new Set();
   let skipped = 0;
-  ctx.plan.forEach((x, i) => {
-    if (x.same) { skipped++; return; }
-    if (x.other && ctx.moveSame) {
-      x.other.courseId = co.id;
-      x.other.bookId = co.bookId;
-      moved.push(x.other);
+  ctx.rows.forEach((r, i) => {
+    if (r.empty || !r.on) { skipped++; return; }
+    if (!r.same && r.other && ctx.moveSame && !movedIds.has(r.other.id)) {
+      r.other.courseId = co.id; r.other.bookId = co.bookId;
+      movedIds.add(r.other.id); moved.push(r.other);
       return;
     }
-    created.push({ id: uid('ch'), bookId: b.id, courseId: co.id, name: x.it.name, createdAt: now + i });
+    created.push({ id: uid('ch'), bookId: b.id, courseId: co.id, name: r.name.trim(), createdAt: now + i });
   });
-  if (!created.length && !moved.length) {
-    toast('没有需要新建的章节（全部已存在）', 3000);
-    document.getElementById('polBatchChapterStatus').innerHTML = `已存在 ${skipped} 个章节，本次没有新增。`;
-    return;
-  }
-  S.chapters = S.chapters.concat(created);     // single write
+  if (!created.length && !moved.length) { toast('没有勾选需要创建的章节', 3000); return; }
+  S.chapters = S.chapters.concat(created);     // append only: existing chapters/questions/logs untouched
   save();
   batchChapterCtx = null;
   closeSheet('genericSheet');
   render();
-  toast('已新增 ' + created.length + ' 个章节' + (moved.length ? '，移动 ' + moved.length + ' 个' : '') + (skipped ? '，跳过 ' + skipped + ' 个' : ''), 3200);
+  toast('已新增 ' + created.length + ' 个章节' + (moved.length ? '，移动 ' + moved.length + ' 个' : '') + (skipped ? '，未创建 ' + skipped + ' 行' : ''), 3200);
 }
 
 /* ================================================================
