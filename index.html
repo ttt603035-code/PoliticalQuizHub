@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Politics Quiz">
+<meta name="app-version" content="2026.10.27.1">
 <title>Politics Quiz Hub</title>
 <style>
 /* ===== Base / layout / components: extracted verbatim from index 二 (Quiz Hub) ===== */
@@ -999,6 +1000,15 @@ html[data-theme="dark"] .q-actions button.on { color:#1C1C1E; }
 .pol-plan-row { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; background:var(--bg-card); border:1px solid var(--line-light); border-radius:var(--radius-sm); }
 .pol-plan-main { flex:1 1 auto; min-width:0; }
 .pol-plan-name { font-size:13px; font-weight:700; line-height:1.5; overflow-wrap:anywhere; word-break:break-word; }
+/* ---- manual refresh button (topbar, before Review) ---- */
+.topbar .topbar-actions .apple-btn.topbar-refresh { flex:0 0 auto; width:38px; height:38px; min-width:38px; padding:0; justify-content:center; border-radius:50%; position:relative; }
+.topbar-refresh::after { content:''; position:absolute; inset:-4px; border-radius:50%; }   /* ≥44px touch target */
+.topbar-refresh svg { width:16px; height:16px; }
+.topbar-refresh.spinning svg { animation: pqhSpin .8s linear infinite; }
+.topbar-refresh[disabled] { opacity:.6; cursor:default; }
+@keyframes pqhSpin { to { transform: rotate(360deg); } }
+/* ---- batch chapter delete ---- */
+.bar.bd-sel { border-color: var(--ink); }
 .pol-plan-input { width:100%; box-sizing:border-box; padding:7px 9px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--bg-card); color:var(--ink); font-size:16px; font-family:inherit; }
 .pol-plan-sub { font-size:11px; color:var(--ink-secondary); line-height:1.6; margin-top:2px; overflow-wrap:anywhere; }
 .pol-badge { flex:0 0 auto; font-size:10px; font-weight:700; padding:3px 8px; border-radius:var(--radius-pill); border:1px solid var(--line); color:var(--ink-secondary); white-space:nowrap; }
@@ -1063,6 +1073,7 @@ html[data-theme="dark"] .q-actions button.on { color:#1C1C1E; }
     <button class="apple-btn small" id="topbarSidebarToggle" onclick="toggleSidebar()" title="展开/折叠导航栏" style="margin-right:8px;padding:6px 8px;color:var(--ink);"><svg style="width:16px;height:16px;vertical-align:-3px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="9" y1="4" x2="9" y2="20"/></svg></button>
     <div class="topbar-title" id="topbarTitle">Politics Quiz Hub</div>
     <div class="topbar-actions">
+      <button class="apple-btn topbar-refresh" id="topRefreshBtn" type="button" onclick="refreshApp()" title="检查更新并刷新" aria-label="检查更新并刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
       <button class="apple-btn" id="topReviewBtn" onclick="go('review')">Review</button>
     </div>
   </header>
@@ -1713,6 +1724,7 @@ function updateChrome() {
 
 function render() {
   sanitizeUI();
+  if (UI.view !== 'course') batchDel = null;      // batch-delete select mode only lives on the course page
   updateChrome();
   const c = document.getElementById('mainContent');
   let html = '';
@@ -1849,20 +1861,24 @@ function renderCourse() {
     ${statChips(st)}
   </div>`;
   if (isUncat) {
-    h += `<div class="quiz-toolbar"><div class="section-pills"><div class="pill add" onclick="addChapter('${b.id}','')">+ New Chapter</div><div class="pill" onclick="go('book',{bookId:'${b.id}'})">返回课程列表</div></div></div>`;
+    h += `<div class="quiz-toolbar"><div class="section-pills"><div class="pill add" onclick="addChapter('${b.id}','')">+ New Chapter</div>${chs.length ? '<div class="pill" onclick="startBatchDelete()" title="选择多个章节一次删除">批量删除</div>' : ''}<div class="pill" onclick="go('book',{bookId:'${b.id}'})">返回课程列表</div></div></div>`;
   } else {
     h += `<div class="quiz-toolbar"><div class="section-pills pol-pills">
       <div class="pill add" onclick="addChapter('${b.id}','${co.id}')">+ New Chapter</div>
       <div class="pill" onclick="openBatchChapterSheet('${b.id}','${co.id}')" title="粘贴教材目录，一次创建多个章节">批量创建章节</div>
       <div class="pill" onclick="openMultiImportSheet('${b.id}','${co.id}')" title="粘贴/上传多章节 JSON，一次导入整门课的题目">批量导入多章题目</div>
       <div class="pill" onclick="openBookImportSheet('${b.id}')" title="导出/导入这本书的章节与题目">教材 Import / Export</div>
+      ${chs.length ? '<div class="pill" onclick="startBatchDelete()" title="选择多个章节一次删除">批量删除</div>' : ''}
     </div></div>`;
   }
+  const bd = batchDelActive(b.id);
+  if (bd && chs.length) h += batchDelBarHTML(chs);
   if (!chs.length) {
     return h + `<div class="empty-state">这个课程还没有章节。<br>${isUncat ? '点击 “+ New Chapter” 新建。' : '点击 “批量创建章节” 粘贴教材目录，或 “+ New Chapter” 手动创建。'}</div>`;
   }
   chs.forEach(c => {
     const cst = statsFor(questionsOfChapter(c.id));
+    if (bd) { h += batchDelRowHTML(c, cst); return; }
     h += `<div class="bar">
       <div class="bar-head">
         <div style="min-width:0;"><h2 class="bar-title" style="font-size:17px;">${esc(c.name)}</h2>
@@ -4132,6 +4148,209 @@ function onResize() {
   else { let p = null; try { p = JSON.parse(localStorage.getItem(SIDEBAR_KEY)); } catch (e) {} sidebarCollapsed = p === null ? false : !!p; }
   applySidebar();
 }
+/* ================================================================
+   APP VERSION + MANUAL REFRESH  (no Service Worker / manifest in this project)
+   Version lives in <meta name="app-version"> — bump it on every deploy.
+   Flow: flush data → fetch canonical URL with cache:'reload' (also rewrites the
+   HTTP-cache entry the home-screen icon launches from) → read remote version →
+   navigate to a cache-busted URL. Never touches localStorage contents.
+   ================================================================ */
+const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || 'dev';
+window.APP_VERSION = APP_VERSION;
+(function stripRefreshParam() {          // keep the address clean after a cache-busted reload
+  try {
+    const u = new URL(location.href);
+    if (u.searchParams.has('_pqh_r')) { u.searchParams.delete('_pqh_r'); history.replaceState(null, '', u.pathname + u.search + u.hash); }
+  } catch (e) {}
+})();
+let _refreshing = false;
+async function refreshApp() {
+  if (_refreshing) return;                // block rapid repeat taps
+  _refreshing = true;
+  const btn = document.getElementById('topRefreshBtn');
+  if (btn) { btn.classList.add('spinning'); btn.disabled = true; }
+  const finish = () => { _refreshing = false; if (btn) { btn.classList.remove('spinning'); btn.disabled = false; } };
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  try {
+    /* 1. make sure the current state is on disk — abort if it is not */
+    try { save(); saveUI(); } catch (e) {}
+    let persisted = false;
+    try { persisted = localStorage.getItem(STORE_KEY) === JSON.stringify(S); } catch (e) {}
+    if (!persisted) { toast('数据保存失败，已取消刷新。请先导出备份。', 4200); finish(); return; }
+    /* 2. local files have no deployed version to fetch */
+    if (location.protocol !== 'http:' && location.protocol !== 'https:') {
+      toast('本地文件模式：直接重新加载', 1600); await sleep(300); location.reload(); return;
+    }
+    if (navigator.onLine === false) { toast('当前离线，无法检查更新。已继续使用现有版本。', 3600); finish(); return; }
+    /* 3. fetch newest HTML, bypassing and rewriting the HTTP cache entry */
+    const base = location.origin + location.pathname;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 12000);
+    let res, html;
+    try {
+      res = await fetch(base, { cache: 'reload', credentials: 'same-origin', signal: ctl.signal });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      html = await res.text();
+    } finally { clearTimeout(timer); }
+    if (!/id=["']mainContent["']/.test(html)) { toast('返回的内容不是本应用页面（可能被网络拦截），已取消更新。', 4200); finish(); return; }
+    const m = html.match(/<meta\s+name=["']app-version["']\s+content=["']([^"']*)["']/i);
+    const latest = m ? m[1] : null;
+    if (latest && latest !== APP_VERSION) toast('发现新版本 ' + latest + '（当前 ' + APP_VERSION + '），正在更新…', 1800);
+    else toast('当前已是最新版本（' + APP_VERSION + '），正在重新加载…', 1500);
+    await sleep(500);
+    /* 4. unique URL → guaranteed network fetch of the newest HTML */
+    location.replace(base + '?_pqh_r=' + Date.now());
+  } catch (e) {
+    const name = e && e.name, msg = (e && e.message) || '';
+    if (name === 'AbortError') toast('检查更新超时，请检查网络后重试。', 3800);
+    else if (/^HTTP /.test(msg)) toast('更新失败：服务器返回 ' + msg.slice(5) + '。', 3800);
+    else toast('更新失败：无法连接网络。当前页面和数据不受影响。', 3800);
+    finish();
+  }
+}
+
+/* ================================================================
+   BATCH CHAPTER DELETE (current course only)
+   Select mode is transient (never saved). Deleting asks what to do with the
+   questions: move them to another chapter of the same course (keeps answer
+   log / wrong book / review schedule) or delete them together with the chapters.
+   ================================================================ */
+let batchDel = null;      // { bookId, courseId, sel:Set<chapterId> }
+let batchDelBusy = false;
+function batchDelActive(bookId) {
+  return batchDel && batchDel.bookId === bookId && batchDel.courseId === UI.courseId ? batchDel : null;
+}
+function batchDelValid() { return batchDel ? chaptersOfCourse(batchDel.bookId, batchDel.courseId) : []; }
+function startBatchDelete() {
+  if (UI.view !== 'course' || !UI.bookId || !UI.courseId) return;
+  batchDel = { bookId: UI.bookId, courseId: UI.courseId, sel: new Set() };
+  render();
+}
+function batchDelBarHTML(chs) {
+  const n = chs.filter(c => batchDel.sel.has(c.id)).length;
+  return `<div class="bar" id="batchDelBar" style="border-color:var(--ink);">
+    <div class="bar-head">
+      <div style="min-width:0;"><h2 class="bar-title" style="font-size:16px;">批量删除章节</h2>
+        <div class="bar-sub" id="batchDelCount">已选择 ${n} / ${chs.length} 个章节</div></div>
+      <div class="bar-actions">
+        <button class="apple-btn small" onclick="batchDelSelectAll()">全选</button>
+        <button class="apple-btn small" onclick="batchDelClearAll()">取消全选</button>
+        <button class="apple-btn small" onclick="batchDelCancel()">取消</button>
+        <button class="apple-btn small primary" id="batchDelGo" ${n ? '' : 'disabled style="opacity:.45;cursor:default;"'} onclick="batchDelOpenConfirm()">删除所选章节</button>
+      </div>
+    </div>
+    <div class="bar-sub" style="margin-top:8px;">只会删除当前课程中勾选的章节，其它课程的同名章节不受影响。点「删除所选章节」后还会再确认一次。</div>
+  </div>`;
+}
+function batchDelRowHTML(c, cst) {
+  const on = batchDel.sel.has(c.id);
+  return `<div class="bar bd-row ${on ? 'bd-sel' : ''}" id="bdrow_${c.id}" onclick="batchDelToggle('${c.id}')" style="cursor:pointer;">
+    <div style="display:flex;align-items:flex-start;gap:12px;min-width:0;">
+      <input type="checkbox" id="bdchk_${c.id}" ${on ? 'checked' : ''} onclick="event.stopPropagation();batchDelToggle('${c.id}')" style="width:20px;height:20px;margin-top:1px;flex:0 0 auto;" aria-label="选择章节 ${esc(c.name)}">
+      <div style="min-width:0;"><h2 class="bar-title" style="font-size:17px;">${esc(c.name)}</h2>
+        <div class="bar-sub">${cst.total} 题${cst.total ? ' · 已做 ' + cst.answered : ''}</div></div>
+    </div></div>`;
+}
+function batchDelRefresh() {
+  if (!batchDel) return;
+  const valid = batchDelValid();
+  let n = 0;
+  valid.forEach(c => {
+    const on = batchDel.sel.has(c.id); if (on) n++;
+    const chk = document.getElementById('bdchk_' + c.id); if (chk) chk.checked = on;
+    const row = document.getElementById('bdrow_' + c.id); if (row) row.classList.toggle('bd-sel', on);
+  });
+  const cnt = document.getElementById('batchDelCount'); if (cnt) cnt.textContent = '已选择 ' + n + ' / ' + valid.length + ' 个章节';
+  const go = document.getElementById('batchDelGo');
+  if (go) { go.disabled = !n; go.style.opacity = n ? '' : '.45'; go.style.cursor = n ? '' : 'default'; }
+}
+function batchDelToggle(id) {
+  if (!batchDel) return;
+  if (!batchDelValid().some(c => c.id === id)) return;       // only chapters of THIS course
+  if (batchDel.sel.has(id)) batchDel.sel.delete(id); else batchDel.sel.add(id);
+  batchDelRefresh();
+}
+function batchDelSelectAll() { if (!batchDel) return; batchDelValid().forEach(c => batchDel.sel.add(c.id)); batchDelRefresh(); }
+function batchDelClearAll() { if (!batchDel) return; batchDel.sel.clear(); batchDelRefresh(); }
+function batchDelCancel() { batchDel = null; render(); }      // changes no data
+function batchDelOpenConfirm() {
+  const bd = batchDel; if (!bd) return;
+  const b = getBook(bd.bookId); if (!b) { toast('书籍不存在'); return; }
+  const valid = chaptersOfCourse(b.id, bd.courseId);
+  const picked = valid.filter(c => bd.sel.has(c.id));
+  if (!picked.length) { toast('请先勾选要删除的章节'); return; }
+  const idSet = new Set(picked.map(c => c.id));
+  const counts = picked.map(c => ({ c: c, n: questionsOfChapter(c.id).length }));
+  const total = counts.reduce((a, x) => a + x.n, 0);
+  const keep = valid.filter(c => !idSet.has(c.id));
+  let h = `<div style="display:flex;flex-direction:column;gap:12px;font-size:13px;line-height:1.7;">
+    <div><b>即将删除以下 ${picked.length} 个章节：</b></div>
+    <ul style="margin:0;padding-left:20px;max-height:30vh;overflow:auto;">${counts.map(x => `<li>${esc(x.c.name)}<span style="color:var(--ink-secondary);">（${x.n} 题）</span></li>`).join('')}</ul>`;
+  if (total > 0) {
+    h += `<div class="pol-note warn">这些章节共包含 <b>${total}</b> 道题。请选择题目怎么处理：</div>
+    <label class="pol-check"><input type="radio" name="bdMode" id="bdModeMove" value="move" ${keep.length ? 'checked' : 'disabled'}>
+      <span>仅删除章节，把这 ${total} 道题转移到本课程的另一个章节（答题记录、错题记录、复习进度全部保留）：<br>
+      <select id="bdTarget" class="pol-select" style="margin-top:6px;max-width:100%;" ${keep.length ? '' : 'disabled'}>${keep.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></span></label>
+    <label class="pol-check"><input type="radio" name="bdMode" id="bdModeDel" value="del" ${keep.length ? '' : 'checked'}>
+      <span>同时删除章节及其 ${total} 道题（连同这些题的答题记录和错题记录，不可恢复）</span></label>
+    ${keep.length ? '' : '<div class="pol-note">所选章节已包含本课程的全部章节，没有可转移题目的章节。如要保留题目，请取消后少选一个章节。</div>'}`;
+  } else {
+    h += `<div class="pol-note">所选章节里没有题目，只会删除章节本身。</div>`;
+  }
+  h += `<div>请确认是否继续。</div></div>`;
+  openGenericSheet('确认删除章节', h, [
+    { text: '取消', onclick: () => closeSheet('genericSheet') },
+    { text: '确认删除', cls: 'primary', onclick: batchDelExecute }
+  ]);
+}
+function batchDelExecute() {
+  if (batchDelBusy) return;                                // no double submit
+  const bd = batchDel; if (!bd) return;
+  const b = getBook(bd.bookId); if (!b) { toast('书籍不存在'); return; }
+  const valid = chaptersOfCourse(b.id, bd.courseId);
+  const picked = valid.filter(c => bd.sel.has(c.id));       // only chapters of the current course
+  if (!picked.length) { toast('没有可删除的章节'); return; }
+  const idSet = new Set(picked.map(c => c.id));
+  const qIds = new Set(S.questions.filter(q => idSet.has(q.chapterId)).map(q => q.id));
+  let mode = 'none', target = null;
+  if (qIds.size > 0) {
+    const mv = document.getElementById('bdModeMove'), dl = document.getElementById('bdModeDel');
+    if (mv && mv.checked) {
+      mode = 'move';
+      const tid = (document.getElementById('bdTarget') || {}).value;
+      target = valid.find(c => c.id === tid && !idSet.has(c.id)) || null;
+      if (!target) { toast('请选择有效的目标章节'); return; }
+    } else if (dl && dl.checked) mode = 'delete';
+    else { toast('请先选择题目的处理方式'); return; }
+  }
+  batchDelBusy = true;
+  const btn = document.querySelector('#genericSheetFoot .primary'); if (btn) btn.disabled = true;
+  const snap = JSON.stringify({ chapters: S.chapters, questions: S.questions, answerLog: S.answerLog, wrongBook: S.wrongBook });
+  const restore = () => { const o = JSON.parse(snap); S.chapters = o.chapters; S.questions = o.questions; S.answerLog = o.answerLog; S.wrongBook = o.wrongBook; };
+  try {
+    let moved = 0, removed = 0;
+    if (mode === 'move') {
+      S.questions.forEach(q => { if (idSet.has(q.chapterId)) { q.chapterId = target.id; moved++; } });
+      S.wrongBook.forEach(w => { if (qIds.has(w.qId)) w.chapterId = target.id; });
+    } else if (mode === 'delete') {
+      removed = removeQuestionsWhere(q => idSet.has(q.chapterId));
+    }
+    S.chapters = S.chapters.filter(c => !idSet.has(c.id));
+    if (UI.chapterId && idSet.has(UI.chapterId)) UI.chapterId = null;
+    save();
+    if (localStorage.getItem(STORE_KEY) !== JSON.stringify(S)) throw new Error('保存到本地存储失败');
+    batchDel = null;
+    closeSheet('genericSheet');
+    render(); saveUI();
+    toast('已删除 ' + picked.length + ' 个章节' + (moved ? '，' + moved + ' 道题已转移到「' + target.name + '」' : '') + (removed ? '，同时删除 ' + removed + ' 道题' : ''), 3600);
+  } catch (e) {
+    restore();
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (_) {}
+    toast('删除失败：' + (e && e.message ? e.message : e) + '。原有数据已保留。', 4200);
+    if (btn) btn.disabled = false;
+  } finally { batchDelBusy = false; }
+}
+
 let lastRenderDate = todayISO();
 function init() {
   loadState();
